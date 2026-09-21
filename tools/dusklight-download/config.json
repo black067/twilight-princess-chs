@@ -1,0 +1,7 @@
+{
+  "dist": "dist",
+  "sources": [
+    { "repo": "snnh/dusk-cn", "tag": "latest" },
+    { "repo": "TwilitRealm/dusklight", "tag": "latest" }
+  ]
+}
