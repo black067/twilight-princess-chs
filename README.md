@@ -1,6 +1,6 @@
-# zelda-twilight-princess-**
+# 塞尔达传说：黄昏公主汉化 MOD
 
-** ** **版《塞尔达传说：黄昏公主》（** / **）的拆包与逆向工程。
+塞尔达传说：黄昏公主的汉化 mod，用于 [dusklight](https://github.com/TwilitRealm/dusklight)
 
 > **本仓库只有脚本与文档**
 > 官方素材（APK、pak、提取出的 `cn/text/` 与 `cn/font/`、打出来的 `.dusk` 成品包）**请自行准备**，用脚本从自备的正版 pak 获取

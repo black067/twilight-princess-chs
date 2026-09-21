@@ -56,7 +56,75 @@ NAME_VARIANT = {
 }
 
 
-def name_keyboard_aliases(orig_glyph, free_slots=(), tail_slots=(), open_mode=False):
+# 引擎自带名字键盘（上游 d_name.cpp 的 l_mojiEisuPal_1/2，EU 版）里，字库没有的格子。
+# 码位就是表里的码位：0xC0..0xDF/0xE0..0xFF 与 Latin-1 对齐，0x8C/0x9C 是表里用的
+# SJIS 兼容码位，分别对应 Œ/œ。官中字库也没有这些码位，所以这 51 格在实机上是空的。
+PAL_KEY_CODES = (
+    0xC0, 0xC1, 0xC2, 0xC4, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE,
+    0xCF, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD6, 0x8C, 0xD9, 0xDA, 0xDB, 0xDC,
+    0xE0, 0xE1, 0xE2, 0xE4, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE,
+    0xEF, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF6, 0x9C, 0xF9, 0xFA, 0xFB, 0xFC, 0xDF,
+)
+PAL_KEY_CHAR = {0x8C: "\u0152", 0x9C: "\u0153"}
+
+# 默认名字（主角/马）用的单字节码位：0xA1.. 依次对应下面这几个汉字。
+#
+# 背景：EU 版的名字输入路径（d_name_c::NameStrSet 的 PAL 分支）**每字符只取 1 字节**
+# （`mChrInfo[i].mCharacter = static_cast<u8>(*moji); moji++;`），而且名字框是把这个字节
+# 单独 `%c` 格式化进 J2DTextBox；官中的「林克」是 2 字节码位，被拆成两个假字后
+# 还会把后面的 ESC(0x1B) 当前导字节的尾字节吞掉 → 名字框乱码。
+#
+# 但 0xA0..0xDF 在 ShiftJIS 里不是前导字节（JUTFont::isLeadByte_ShiftJIS 只看
+# 0x81..0x9F / 0xE0..0xFC），所以字体路径（逐字节）与消息路径（parseCharacter_ShiftJIS）
+# 都会把它当成**完整的单字节码位**，两边的码值还一致。于是把这些码位指到字库里
+# 已有的汉字字形槽，就能不改引擎地让「林克 / 伊波娜」这种默认名正确显示。
+# 副作用：一个字 = 1 个字符位置，名字长度上限 8 ⇒ 最多 8 个汉字。
+NAME_DEFAULT_CHARS = "林克伊波娜"
+NAME_DEFAULT_BASE = 0x00A1
+
+
+class SlotPool:
+    """键盘补全用的槽位池：先捡空闲槽，不够再用图集末尾的空 tail 槽。"""
+
+    def __init__(self, free, tail):
+        self.free = list(free)
+        self.tail = list(tail)
+
+    def take(self, what):
+        if self.free:
+            return self.free.pop(0)
+        if self.tail:
+            return self.tail.pop(0)
+        sys.exit("键盘补全缺少可用槽位：%s" % what)
+
+
+def pal_keyboard_aliases(orig_glyph, pool):
+    """引擎标准键盘（ABC/abc 两页）里字库缺失的格子：分配槽位并待渲染。
+
+    返回 (aliases, new_chars)：new_chars = {新槽: 字符}。
+    """
+    aliases = []
+    new_chars = {}
+    assigned = {}
+    kept = added = 0
+    for code in PAL_KEY_CODES:
+        char = PAL_KEY_CHAR.get(code, chr(code))
+        glyph = orig_glyph.get(ord(char))
+        if glyph is not None:
+            kept += 1
+        else:
+            glyph = assigned.get(char)
+            if glyph is None:
+                glyph = pool.take("标准键盘 %r" % char)
+                assigned[char] = glyph
+                new_chars[glyph] = char
+            added += 1
+        aliases.append((code, glyph))
+    print("   标准键盘补全: %d 格 (原本就有 %d / 新增渲染 %d)" % (len(aliases), kept, added))
+    return aliases, new_chars
+
+
+def name_keyboard_aliases(orig_glyph, pool, open_mode=False):
     """引擎名字键盘字表（l_mojiZh）逐格别名。
 
     原字不在字库的：55 个日式写法换成对应简体字；其余格在 open 模式分配
@@ -67,8 +135,6 @@ def name_keyboard_aliases(orig_glyph, free_slots=(), tail_slots=(), open_mode=Fa
         doc = json.load(f)
     table = [int(c, 16) for c in doc["codes"]]
     blank = orig_glyph[0x3000]
-    free = list(free_slots)
-    tail = list(tail_slots)
     aliases = []
     new_chars = {}
     assigned = {}
@@ -86,12 +152,7 @@ def name_keyboard_aliases(orig_glyph, free_slots=(), tail_slots=(), open_mode=Fa
             elif open_mode:
                 glyph = assigned.get(char)
                 if glyph is None:
-                    if free:
-                        glyph = free.pop(0)
-                    elif tail:
-                        glyph = tail.pop(0)
-                    else:
-                        sys.exit("键盘补全缺少可用槽位")
+                    glyph = pool.take("中文键盘 %r" % char)
                     assigned[char] = glyph
                     new_chars[glyph] = char
                 added += 1
@@ -102,6 +163,22 @@ def name_keyboard_aliases(orig_glyph, free_slots=(), tail_slots=(), open_mode=Fa
     print("   名字键盘别名: %d 格 (原字 %d / 换简体 %d / 补全渲染 %d / 空白 %d)"
           % (len(aliases), direct, variant, added, blanked))
     return aliases, new_chars, (direct, variant, blanked, added)
+
+
+def name_default_aliases(orig_glyph):
+    """默认名字用的单字节码位（0xA1..）→ 字库里既有的字形槽。
+
+    不新增槽位、不重渲染：只把码位指到已有字形，所以对像素与压缩结果零影响。
+    返回 aliases = [(码位, 槽位)]。
+    """
+    aliases = []
+    for i, char in enumerate(NAME_DEFAULT_CHARS):
+        glyph = orig_glyph.get(ord(char))
+        assert glyph is not None, "字库里没有默认名字的字形：%r" % char
+        aliases.append((NAME_DEFAULT_BASE + i, glyph))
+    print("   默认名单字节别名: %d 条 (%s -> %#x..%#x)"
+          % (len(aliases), NAME_DEFAULT_CHARS, aliases[0][0], aliases[-1][0]))
+    return aliases
 
 
 def add_aliases(body, blocks, orig_glyph, remap, kb_aliases):
@@ -199,8 +276,13 @@ def main():
             used = set(orig_glyph.values()) | {c - sc for sc, ec in m0 for c in range(sc, ec + 1)}
             free = sorted(set(range(total)) - used)
             tail = list(range(total, fields["numRows"] * fields["numColumns"]))
+            pool = SlotPool(free, tail)
             kb_aliases, new_chars, kb_stats = name_keyboard_aliases(
-                orig_glyph, free, tail, open_mode=bool(renderer))
+                orig_glyph, pool, open_mode=bool(renderer))
+            pal_aliases, pal_chars = ((), {}) if not renderer else \
+                pal_keyboard_aliases(orig_glyph, pool)
+            new_chars.update(pal_chars)
+            name_aliases = name_default_aliases(orig_glyph) if renderer else ()
 
             if renderer and new_chars:
                 end_code = None
@@ -228,7 +310,8 @@ def main():
                 arc2 = bytearray(font.overwrite_gly1(bytes(arc2), atlas, end_code))
                 _, _, blocks = R.parse_bfn(bytes(arc2))
 
-            new_bfn = add_aliases(bytes(arc2), blocks, orig_glyph, remap, kb_aliases)
+            new_bfn = add_aliases(bytes(arc2), blocks, orig_glyph, remap,
+                                  list(kb_aliases) + list(pal_aliases) + list(name_aliases))
             new_arc = patch_rarc(arc, start, new_bfn)
             path = os.path.join(OUT_DIR, dst.replace("/", "_"))
             with open(path, "wb") as f:
@@ -240,6 +323,14 @@ def main():
                 "new_chars": {"%04X" % i: ch for i, ch in sorted(new_chars.items())},
                 "direct": kb_stats[0], "variant": kb_stats[1],
                 "added": kb_stats[3], "blanked": kb_stats[2],
+                "pal": {
+                    "aliases": [["%04X" % c, "%04X" % i] for c, i in pal_aliases],
+                    "added": len(pal_chars),
+                },
+                "name_default": {
+                    "aliases": [["%04X" % c, "%04X" % i] for c, i in name_aliases],
+                    "chars": NAME_DEFAULT_CHARS,
+                },
             }
     finally:
         if renderer:

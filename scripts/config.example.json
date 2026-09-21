@@ -7,11 +7,12 @@
     "out": "dist",
     "region": "eu",
     "language": "fr",
+    "repo": "https://github.com/black067/twilight-princess-chs",
     "mod": {
         "id": "zh.hans",
         "name": "Localization - Chinese (Simplified)",
         "version": "1.0.0",
         "author": "Yiga Clan",
-        "description": "Chinese Localization Mod. Replace {region} version (Language Slot: {language}); Thanks ** Tech."
+        "description": "A Chinese localization mod that replaces the {language} localization in the {region} version.\nThe text content is sourced from the Nvidia ** version (thanks to **).\nThe font set has been repacked using open-source fonts. (If you want to use the official font set, please clone the source code and repack it yourself.)\nIf you find any bugs, feel free to open an issue.\nMod source code: {repo}\nBug reports, discussions, and forks are welcome."
     }
 }
