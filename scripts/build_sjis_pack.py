@@ -7,15 +7,7 @@ import zipfile
 
 import paths
 
-# 文本部件（两个变体共用）写在 open 变体的目录里
-TEXT_PARTS = paths.parts_dir("open")
-
-# name/description 里 {region} / {language} / {repo} 的展开（写给玩家看）
-SLOT_NAMES = {
-    "region": {"us": "United States", "eu": "Europe", "jp": "Japan"},
-    "language": {"us": "English (US)", "uk": "English (UK)", "de": "German", "fr": "French",
-                 "sp": "Spanish", "it": "Italian", "jp": "Japanese"},
-}
+# name/description/id 里 {region} / {language} / {repo} 的展开在 paths.expand
 
 # mod.json 的文本字段：顺序即包内键序（客户端 manifest.cpp 按名字取，顺序无要求，
 # 但固定成 id→name→version→author→description→icon→banner，方便与包内内容对拍）。
@@ -33,16 +25,6 @@ MAX_DESCRIPTION = 265
 MOD_ID_RE = re.compile(r"^[a-z0-9_.]+$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 URL_RE = re.compile(r"https?://|www\.", re.IGNORECASE)
-
-
-def fill_slot(text, region, language):
-    """展开 name/description 里的占位符：{region} / {language} / {repo}。"""
-    repo = str(paths.config_value("repo") or "")
-    if "{repo}" in text and not repo:
-        print("警告：描述里用了 {repo}，但 config.json 没配 repo", file=sys.stderr)
-    return (text.replace("{region}", SLOT_NAMES["region"][region])
-                .replace("{language}", SLOT_NAMES["language"][language])
-                .replace("{repo}", repo))
 
 
 def select_fields(meta, variant):
@@ -145,39 +127,30 @@ def collect_images(meta):
     return out
 
 
-def collect(dir_path, want_font):
-    """目录里的部件 -> [(zip 内路径, 文件路径)]；want_font 区分字库/文本槽。"""
-    out = []
-    for entry in sorted(os.listdir(dir_path)):
-        parts = entry.split("_", 2)
-        if len(parts) != 3 or parts[0] != "res":
-            continue
-        if (parts[1] == paths.font_dir()) != want_font:
-            continue
-        out.append(("overlay/res/%s/%s" % (parts[1], parts[2]), os.path.join(dir_path, entry)))
-    return out
+def overlay_entries(variant, region, language):
+    """部件 -> [(zip 内路径, 文件路径)]：字库写进 Font<region>，消息写进 Msg<language>。"""
+    fonts = paths.font_parts(variant)
+    for name, path in fonts:
+        if not os.path.exists(path):
+            sys.exit("缺字库部件 %s：先跑 patch_sjis_font.py" % path)
+    texts = paths.text_parts()
+    if not texts:
+        sys.exit("缺文本部件：先跑 patch_sjis_text.py（%s）" % paths.parts_dir("open"))
+    return ([("overlay/res/%s/%s" % (paths.font_dir(region), n), p) for n, p in fonts]
+            + [("overlay/res/%s/%s" % (paths.msg_dir(language), n), p) for n, p in texts])
 
 
 def build(variant, meta, region, language, out_dir, check_only=False):
-    """打一个变体：meta 就是 config 里那一段，字库部件按变体取。"""
+    """打一个变体在一个地区的包。"""
     meta = select_fields(meta, variant)
-    meta["name"] = fill_slot(str(meta.get("name", "")), region, language)
-    meta["description"] = fill_slot(str(meta.get("description", "")), region, language)
-    print("== %s 变体 ==" % variant)
+    print("== %s 变体 / %s 盘 ==" % (variant, region))
     print_meta(meta)
     check_meta(meta)
     images = collect_images(meta)      # --check 也过一遍图片（存在性 + PNG 尺寸）
     if check_only:
         return None
 
-    font_parts = paths.parts_dir(variant)
-    if not os.path.isdir(font_parts):
-        sys.exit("缺 %s 变体的字库部件：先跑 patch_sjis_font.py（%s）" % (variant, font_parts))
-    fonts = collect(font_parts, want_font=True)
-    files = sorted(collect(TEXT_PARTS, want_font=False) + fonts)
-    assert files, "no parts found in %s" % TEXT_PARTS
-    assert len(fonts) == 2, "%s 里应有 2 个字体部件，实际 %d" % (font_parts, len(fonts))
-
+    files = sorted(overlay_entries(variant, region, language))
     entries = [(arcname, src) for _, arcname, src in images] + files
     for key, arcname, _ in images:
         meta[key] = arcname             # manifest 里写包内路径
@@ -189,7 +162,7 @@ def build(variant, meta, region, language, out_dir, check_only=False):
         for arcname, path in entries:
             z.write(path, arcname)
     print("built %s  %d bytes  id=%s  字库部件来自 %s"
-          % (out, os.path.getsize(out), meta["id"], os.path.basename(font_parts)))
+          % (out, os.path.getsize(out), meta["id"], paths.PARTS_DIR[variant]))
     for arcname, _ in entries:
         print("   %s" % arcname)
     return out
@@ -197,21 +170,25 @@ def build(variant, meta, region, language, out_dir, check_only=False):
 
 def main():
     check_only = "--check" in sys.argv
-    region, language = paths.slot()
-    out_dir = paths.config_dir("out", os.path.join("work", "mods"))
-    os.makedirs(out_dir, exist_ok=True)
-    if os.path.isdir(TEXT_PARTS):
-        other = sorted({p[1] for p in (e.split("_", 2) for e in os.listdir(TEXT_PARTS))
-                        if len(p) == 3 and p[0] == "res"} - {paths.font_dir(), paths.msg_dir()})
-        if other:
-            print("提示：部件里还有非当前槽位的目录：%s" % ", ".join(other))
-    elif not check_only:
-        sys.exit("缺文本部件：先跑 patch_sjis_text.py（%s）" % TEXT_PARTS)
+    region_filter = paths.cli("--region")
+    variant_filter = paths.cli("--variant")
+    discs = [d for d in paths.discs() if not region_filter or d[0] == region_filter]
+    if not discs:
+        sys.exit("--region %s 不在配置的 discs 里（%s）"
+                 % (region_filter, " / ".join(r for r, _ in paths.discs())))
+    variants = [v for v, _ in paths.VARIANTS if not variant_filter or v == variant_filter]
+    if not variants:
+        sys.exit("--variant 只支持 %s" % " / ".join(v for v, _ in paths.VARIANTS))
 
-    for variant, key in paths.VARIANTS:
-        meta = paths.config_value(key)
-        if not isinstance(meta, dict):
-            sys.exit("%s 里缺 %s 段（id/name/description）" % (paths.CONFIG_EXAMPLE, key))
+    out_dir = paths.out_dir()
+    os.makedirs(out_dir, exist_ok=True)
+    jobs = [(v, r, l, paths.mod_meta(v, r, l)) for r, l in discs for v in variants]
+    ids = [m["id"] for *_, m in jobs]
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    if dup:
+        sys.exit("mod id 重复（id 模板里要有 {region}）：%s" % ", ".join(dup))
+
+    for variant, region, language, meta in jobs:
         build(variant, meta, region, language, out_dir, check_only)
     if check_only:
         print("--check：只校验元数据，没写包")

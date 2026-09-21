@@ -1,8 +1,11 @@
 """把 dist 里的成品包装进游戏目录。
 
-  python scripts/install.py                  # 装开源字体包（open）
-  python scripts/install.py --variant ique   # 装官方字库包
-  python scripts/install.py --list           # 只看现状
+  python scripts/install.py --region us                 # 装美版盘（开源字体包）
+  python scripts/install.py --region jp --variant ique  # 装日版盘（官方字库包）
+  python scripts/install.py --list                      # 只看现状
+
+mod 目录与游戏配置用 --mods-dir / --game-config，或 config 的 mods_dir / game_config
+（dusklight 2.x 与 dusk-cn 的布局不同，两者各填各的）。
 """
 import json
 import os
@@ -27,20 +30,15 @@ DISABLE = (
 )
 
 
-def mod_ids():
-    """{变体: mod id}：直接取 config 里 mod / mod_ique 两段。"""
-    ids = {}
-    for variant, key in paths.VARIANTS:
-        meta = paths.config_value(key)
-        if not isinstance(meta, dict) or not meta.get("id"):
-            sys.exit("%s 里缺 %s.id" % (paths.CONFIG_EXAMPLE, key))
-        ids[variant] = str(meta["id"])
-    return ids
-
-
-def package_path(mod_id):
-    out = paths.config_dir("out", os.path.join("work", "mods"))
-    return os.path.join(out, paths.escape_mod_id(mod_id) + ".dusk")
+def jobs():
+    """[(变体, 地区, 语言, mod id, 包路径)]：config 的 discs x 两个变体。"""
+    out = []
+    for variant, _ in paths.VARIANTS:
+        for region, language in paths.discs():
+            out.append((variant, region, language,
+                        paths.mod_meta(variant, region, language)["id"],
+                        paths.package_path(variant, region, language)))
+    return out
 
 
 def known_mods(mods_dir):
@@ -73,26 +71,26 @@ def write_config(path, cfg):
 
 
 def main():
-    ids = mod_ids()
-    game_dir = paths.game_dir()
-    mods_dir = os.path.join(game_dir, "data", "mods")
-    config_path = os.path.join(game_dir, "data", "config.json")
+    all_jobs = jobs()
+    mods_dir = paths.mods_dir()
+    config_path = paths.game_config()
     cfg = read_config(config_path)
 
     if "--list" in sys.argv:
-        print("游戏目录: %s" % game_dir)
-        ours = set(ids.values())
+        print("mod 目录: %s" % mods_dir)
+        ours = {i for *_, i, _ in all_jobs}
         for name, mod_id, author in known_mods(mods_dir):
             key = "mod.%s.enabled" % paths.escape_mod_id(mod_id) if mod_id else None
             state = "?" if key is None else ("启用" if cfg.get(key) else "停用")
             mark = " <== 本 mod" if mod_id in ours else ""
-            print("  %-26s id=%-18s %s%s" % (name, mod_id or "(读不到)", state, mark))
+            print("  %-30s id=%-24s %s%s" % (name, mod_id or "(读不到)", state, mark))
         return
 
-    variant = str(paths.option("--variant") or "open").lower()
-    if variant not in ids:
-        sys.exit("--variant 只支持 open 或 ique：%s" % variant)
-    src = package_path(ids[variant])
+    variant = str(paths.cli("--variant") or "open").lower()
+    if variant not in dict(paths.VARIANTS):
+        sys.exit("--variant 只支持 %s" % " / ".join(v for v, _ in paths.VARIANTS))
+    region, language = paths.pick_disc(paths.cli("--region"))
+    src = paths.package_path(variant, region, language)
     if not os.path.exists(src):
         sys.exit("找不到成品包：%s（先跑 build_sjis_pack.py）" % src)
 
@@ -102,20 +100,22 @@ def main():
         shutil.copyfile(src, dst)
     except PermissionError:
         sys.exit("写入被拒：%s。游戏正在运行会占住这个文件，请先完全退出游戏。" % dst)
-    print("installed -> %s（%s 变体）" % (dst, variant))
+    print("installed -> %s（%s 变体 / %s 盘）" % (dst, variant, region))
 
-    # 另一个变体的包要清掉：两个包覆盖同一批资源，同时留着可能被同时加载
-    for other, other_id in ids.items():
-        if other == variant:
+    # 其余地区/变体的包要清掉：它们覆盖同一批资源，同时留着可能被同时加载
+    for other_variant, other_region, _l, _i, other_path in all_jobs:
+        if (other_variant, other_region) == (variant, region):
             continue
-        stale = os.path.join(mods_dir, paths.escape_mod_id(other_id) + ".dusk")
+        stale = os.path.join(mods_dir, os.path.basename(other_path))
         if os.path.exists(stale):
             os.remove(stale)
-            print("removed  -> %s（另一个变体）" % stale)
+            print("removed  -> %s（其他地区/变体）" % stale)
 
-    enabled = "mod.%s.enabled" % paths.escape_mod_id(ids[variant])
+    enabled_id = next(i for v, r, _l, i, _p in all_jobs if (v, r) == (variant, region))
+    enabled = "mod.%s.enabled" % paths.escape_mod_id(enabled_id)
     for key in list(DISABLE) + ["mod.%s.enabled" % paths.escape_mod_id(i)
-                                for i in ids.values() if i != ids[variant]]:
+                                for v, r, _l, i, _p in all_jobs
+                                if (v, r) != (variant, region)]:
         cfg[key] = False
     cfg[enabled] = True
     cfg["game.enableChineseNameKeyboard"] = True
@@ -123,7 +123,7 @@ def main():
     print("config: %s = True，其余本 mod 开关已关" % enabled)
 
     # 改过 id / 改过包名的旧包脚本管不着，这里只提醒（同一作者才可能与本 mod 重叠）
-    our_ids = set(ids.values())
+    our_ids = {i for *_, i, _ in all_jobs}
     authors = {str((paths.config_value(k) or {}).get("author") or "")
                for _, k in paths.VARIANTS}
     for name, mod_id, mod_author in known_mods(mods_dir):

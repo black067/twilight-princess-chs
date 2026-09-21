@@ -23,8 +23,6 @@ import bfn_repack as R
 import paths
 import yaz0
 
-PARTS = os.path.join(paths.WORK, "sjis_parts")
-
 
 def is_lead(b):
     return 0x81 <= b <= 0x9F or 0xE0 <= b <= 0xFC
@@ -175,22 +173,23 @@ def check_name_keyboard(path, fm):
 
 
 def main():
-    fontres_path = os.path.join(PARTS, "res_%s_fontres.arc" % paths.font_dir())
+    fontres_path = dict(paths.font_parts("open"))["fontres.arc"]
     fm = font_map(fontres_path)
     fc = set(fm)
     print("字库码位: %d" % len(fc))
     tot = collections.Counter()
     tot_missing = collections.Counter()
     msgs = 0
-    for n in sorted(x for x in os.listdir(PARTS) if x.startswith("res_%s_" % paths.msg_dir())):
-        r = scan(os.path.join(PARTS, n), fc)
+    for name, path in paths.text_parts():
+        r = scan(path, fc)
         if r is None or r.get("empty"):
             continue
         msgs += r["msgs"]
         tot["cut"] += r["cut"]
         tot["chars"] += r["chars"]
         tot_missing += r["missing"]
-        print("%-22s msgs=%-5d 未正常结束=%-5d 缺字命中=%-4d" % (n, r["msgs"], r["cut"], sum(r["missing"].values())))
+        print("%-22s msgs=%-5d 未正常结束=%-5d 缺字命中=%-4d"
+              % (name, r["msgs"], r["cut"], sum(r["missing"].values())))
     print()
     print("合计：%d 条消息，%d 个字符，未正常结束 %d 条，缺字 %d 次" % (msgs, tot["chars"], tot["cut"], sum(tot_missing.values())))
     for c, n in tot_missing.most_common(20):

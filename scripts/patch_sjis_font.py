@@ -21,9 +21,10 @@ MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
 NAME_KEYBOARD = os.path.join(paths.DATA, "name_keyboard.json")
 KB_JSON = os.path.join(paths.WORK, "keyboard_aliases.json")
 
+# pak 里的官中字库 -> 部件文件名（部件不带槽位：打包时按地区写进 Font<region>）
 FONT_SLOTS = {
-    "res/Fontcn/fontres.arc": "res/%s/fontres.arc" % paths.font_dir(),
-    "res/Fontcn/rubyres.arc": "res/%s/rubyres.arc" % paths.font_dir(),
+    "res/Fontcn/fontres.arc": "fontres.arc",
+    "res/Fontcn/rubyres.arc": "rubyres.arc",
 }
 
 SHIFT_JIS_FONT_TYPE = 2
@@ -353,7 +354,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
             new_bfn = add_aliases(bytes(arc2), blocks, orig_glyph, remap,
                                   list(kb_aliases) + list(pal_aliases) + list(name_aliases))
             new_arc = patch_rarc(arc, start, new_bfn)
-            path = os.path.join(out_dir, dst.replace("/", "_"))
+            path = os.path.join(out_dir, dst)
             with open(path, "wb") as f:
                 f.write(yaz0_encode(new_arc))
             print("   wrote %s (arc %d -> %d bytes, yaz0 %d bytes)"

@@ -17,8 +17,7 @@ from list_index import entries
 from patch_sjis_font import NAME_DEFAULT_BASE, NAME_DEFAULT_CHARS
 
 MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
-OUT_DIR = os.path.join(paths.WORK, "sjis_parts")
-TARGET_LANG = paths.msg_dir()
+OUT_DIR = paths.parts_dir("open")    # 文本部件两个变体共用，落在 open 的部件目录
 
 SHIFT_JIS_ENCODING = 3
 TAG = 0x1A
@@ -189,7 +188,7 @@ def main():
         r = next(x for x in recs if x[0] == name)
         blob = bytearray(yaz0.decompress(extract(pak, data_start, name, r[1], r[3])))
         tail = name.split("/")[-1]
-        path = os.path.join(OUT_DIR, ("res_%s_%s" % (TARGET_LANG, tail)).replace("/", "_"))
+        path = os.path.join(OUT_DIR, tail)
         if blob.find(b"MESG") < 0:
             with open(path, "wb") as f:
                 f.write(yaz0_encode(bytes(blob)))

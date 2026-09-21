@@ -64,14 +64,18 @@ def show(tag, blob, off, ids):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dusk", help="成品包，默认取 config 的 out/<mod id>.dusk")
-    ap.add_argument("--entry", help="包内条目，默认 overlay/<消息目录>/bmgres.arc")
+    ap.add_argument("--disc", help="地区（%s），决定默认成品包与包内消息目录"
+                                    % " / ".join(paths.REGIONS))
+    ap.add_argument("--variant", default="open", choices=[v for v, _ in paths.VARIANTS])
+    ap.add_argument("--dusk", help="成品包，默认取 config 的 out/<id>.dusk")
+    ap.add_argument("--entry", help="包内条目，默认 overlay/res/<消息目录>/bmgres.arc")
     ap.add_argument("--ids", default="99,100,101,102,175")
     ap.add_argument("--pak-entry", default="res/Msgcn/bmgres.arc")
     args = ap.parse_args()
     ids = [int(x) for x in args.ids.split(",")]
-    dusk = args.dusk or paths.mod_path()
-    entry = args.entry or "/".join(("overlay", "res", paths.msg_dir(), "bmgres.arc"))
+    region, language = paths.pick_disc(args.disc, "--disc")
+    dusk = args.dusk or paths.package_path(args.variant, region, language)
+    entry = args.entry or "overlay/res/%s/bmgres.arc" % paths.msg_dir(language)
 
     with zipfile.ZipFile(dusk) as z:
         names = z.namelist()

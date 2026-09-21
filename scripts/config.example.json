@@ -1,12 +1,17 @@
 {
     "pak": "<**版 **_prd.pak 的路径（官中文本/字库在这个包里）>",
     "pak_old": "<旧版样本 **_prd.pak 的路径，仅差分对照用，可留空>",
-    "game_dir": "<dusklight 游戏目录，需要其中已有 data/config.json（只有 install.py 用）>",
     "dusklight_exe": "<dusklight.exe 的路径，仅扫符号用，可留空>",
 
     "out": "dist",
-    "region": "eu",
-    "language": "fr",
+    "mods_dir": "<游戏的 mod 目录（放 .dusk）：dusklight 2.x 是 exe 同级的 mods/，dusk-cn 是 <游戏目录>/data/mods/>",
+    "game_config": "<游戏配置 json：dusklight 2.x 是数据目录下的 config.json，dusk-cn 是 <游戏目录>/data/config.json>",
+
+    "discs": [
+        { "region": "us", "language": "us" },
+        { "region": "eu", "language": "fr" },
+        { "region": "jp", "language": "jp" }
+    ],
 
     "glyph_source": "open",
     "fonts": {
@@ -24,7 +29,7 @@
 
     "repo": "https://github.com/black067/twilight-princess-chs",
     "mod": {
-        "id": "yiga.zh.hans",
+        "id": "yiga.zh.hans.{region}",
         "name": "Chinese (Simplified) Translation",
         "version": "1.0.0",
         "author": "Yiga Clan",
@@ -33,7 +38,7 @@
         "banner": "assets/banner.png"
     },
     "mod_ique": {
-        "id": "yiga.zh.hans.ique",
+        "id": "yiga.zh.hans.ique.{region}",
         "name": "Chinese (Simplified) Translation (**)",
         "version": "1.0.0",
         "author": "Yiga Clan",
