@@ -106,6 +106,31 @@ def encode(tokens, remap):
     return bytes(out)
 
 
+def message_slots(blob):
+    """({DAT1 槽起点: token 列表}, [(消息下标, 槽起点)])：按生产几何切。
+
+    原归档允许两条消息共用一段文本（后缀共享），所以按不同偏移切、按槽去重。
+    """
+    off = blob.find(b"MESG")
+    size = struct.unpack_from(">I", blob, off + 8)[0]
+    inner = blob[off : off + size]
+    inf = next(s for s in sections(inner) if s[0] == b"INF1")
+    dat = next(s for s in sections(inner) if s[0] == b"DAT1")
+    nent, esize = struct.unpack_from(">HH", inner, inf[1] + 8)
+    dat_abs = off + dat[1] + 8
+    dat_end = off + dat[1] + dat[2]
+    offsets = [struct.unpack_from(">I", inner, inf[1] + 0x10 + k * esize)[0] for k in range(nent)]
+    starts = sorted(set(offsets))
+    nxt = {}
+    for i, s in enumerate(starts):
+        nxt[s] = starts[i + 1] if i + 1 < len(starts) else dat_end - dat_abs
+    texts = {}
+    for s in starts:
+        limit = dat_abs + nxt[s]
+        texts[s] = decode(blob, dat_abs + s, limit - 2) if limit - (dat_abs + s) >= 2 else []
+    return texts, [(k, o) for k, o in enumerate(offsets)]
+
+
 def default_name_bytes(text):
     """默认名文本 → 单字节码位序列（配合字库里 NAME_DEFAULT_CHARS 的别名）。"""
     return bytes(NAME_DEFAULT_BASE + NAME_DEFAULT_CHARS.index(ch) for ch in text)

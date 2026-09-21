@@ -7,6 +7,7 @@
 
 **现状**：中文文本与中文字库已全部就位，全部游戏内文本的中文已在 dusklight 上跑通——
 标题提示、存档界面、对话、菜单、栏位文字、电视设置页面都正常，主角名与马名正常，中文名字键盘可用。
+文本、容器与字库都由仓库里的脚本从译文表与开源字体生成。
 工程细节见 [docs/技术备忘.md](docs/技术备忘.md)。
 
 ## 仓库内容
@@ -14,11 +15,11 @@
 | 路径 | 内容 |
 | --- | --- |
 | `scripts/` | 移植与打包管线（Python，只用标准库；外部路径见 `config.example.json`）。字库重渲染 `font_render.py` 走 Windows GDI+，**只支持 Windows** |
-| `data/` | 名字键盘字表、消息索引表（`msg_index.json`） |
+| `data/` | 名字键盘字表、消息索引表（`msg_index.json`）、文本资源形状表（`text_resources.json`） |
 | `docs/` | 文档：技术备忘 / 管线复现 / 发布指南（见下方「文档」） |
 | `tools/` | 配套工具：`dusklight-download/` 拉 dusklight / dusk-cn 的 release、启盘镜像 |
 | `cn-mod/` | 引擎侧探针（只当仪器用，正式修复走数据侧） |
-| `cn/` | 素材输入（自备）：`font/` `msg/` 是管线要读的原始归档，`text/` 供人读 |
+| `cn/` | 素材输入（自备）：`msg/` `font/` 是管线要读的原始归档，`texts.csv` 是译文表，`text/` 供人读 |
 | `dist/` | 打出来的 `.dusk` 成品包 |
 | `work/` | 中间数据：`sjis_parts*/` 部件、`fonts/` 开源字体、`keyboard_aliases.json`、诊断脚本与缓存 |
 
@@ -30,15 +31,19 @@
 #    work/fonts/LXGWWenKai-Regular.ttf     霞鹜文楷（OFL-1.1）
 #    cn/font/fontres.arc.yaz0  cn/font/rubyres.arc.yaz0  cn/msg/bmgres*.arc.yaz0
 
-# 1) 打包管线（容器与字库都从零生成；可调项与就地改写路线见 docs/管线复现.md）
-python scripts/build_bmg.py --code-space own   # 消息容器（顺带写 work/code_map.json）
-python scripts/build_bfn.py                    # 两套字库（读同一份码位表）→ work/scratch_parts/
-Copy-Item work\scratch_parts\*.arc work\sjis_parts\ -Force   # 零件归位到打包目录
+# 1) 译文表（一次；之后改译文只动 cn/texts.csv 的 zh-Hans 列）
+python scripts/export_texts.py             # cn/msg/ → cn/texts.csv
+
+# 2) 打包（容器与字库都从零生成；另一条就地改写路线见 docs/管线复现.md）
+python scripts/build_bmg.py                # 消息容器（读 texts.csv，顺带写 work/code_map.json）
+python scripts/build_bfn.py                # 两套字库（读同一份码位表）→ work/scratch_parts/
+Copy-Item work\scratch_parts\*.arc work\sjis_parts\ -Force   # 部件归位到打包目录
+python scripts/verify_texts.py             # 部件 vs texts.csv 逐格比：不一致 0 格
 python scripts/diag_pack.py                # 验收：未正常结束 0 条、缺字 0 次
 python scripts/build_sjis_pack.py --check  # 先校验 mod.json 元数据
 python scripts/build_sjis_pack.py          # 打包 → dist/yiga_zh_hans_<region>.dusk（3 个地区）
 
-# 2) 装进游戏（拷包 + 改配置开关）
+# 3) 装进游戏（拷包 + 改配置开关）
 python scripts/install.py --region us      # --list 只看现状
 ```
 

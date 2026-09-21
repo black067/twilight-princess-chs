@@ -9,6 +9,7 @@
 """
 
 import os
+import struct
 import sys
 
 import paths
@@ -42,3 +43,21 @@ def font_arcs():
 def msg_arcs():
     """[(部件名, RARC)]：消息库部件（bmgres.arc / bmgres1.arc …）。"""
     return _load(MSG_DIR, "消息库")
+
+
+def rarc_files(arc):
+    """{归档内文件名: 数据}。信息块在 header_length 处，文件项占 0x14 字节。"""
+    hdr = struct.unpack_from(">I", arc, 8)[0]
+    _, _, nfiles, fileoff, stlen, stoff = struct.unpack_from(">IIIIII", arc, hdr)
+    strtab = arc[hdr + stoff : hdr + stoff + stlen]
+    data = hdr + struct.unpack_from(">I", arc, 0x0C)[0]
+    out = {}
+    for i in range(nfiles):
+        o = hdr + fileoff + i * 0x14
+        fid, nh, tfno, doff, dsize = struct.unpack_from(">HHIII", arc, o)
+        if tfno >> 24 != 0x11:
+            continue
+        noff = tfno & 0xFFFFFF
+        name = strtab[noff : strtab.index(b"\x00", noff)].decode()
+        out[name] = arc[data + doff : data + doff + dsize]
+    return out

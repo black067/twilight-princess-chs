@@ -1,0 +1,16 @@
+{
+ "note": "文本资源形状：CSV 的 key = <资源>/<单元>[/<格名>]；单格资源省略格名。资源名 = BMG 文件名去掉 .bmg。",
+ "resources": {
+  "zel_00": {"shape": "messages"},
+  "zel_01": {"shape": "messages"},
+  "zel_02": {"shape": "messages"},
+  "zel_03": {"shape": "messages"},
+  "zel_04": {"shape": "messages"},
+  "zel_05": {"shape": "messages"},
+  "zel_06": {"shape": "messages"},
+  "zel_07": {"shape": "messages"},
+  "zel_08": {"shape": "messages"},
+  "zel_unit": {"shape": "string_pairs", "pool": "STR1",
+               "cells": {"one": 2, "other": 3}}
+ }
+}

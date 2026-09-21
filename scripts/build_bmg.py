@@ -1,16 +1,17 @@
-"""从零生成消息归档：RARC 与 BMG 全部自己写，只吃「索引表 + 译文」。
+"""从零生成消息归档：RARC 与 BMG 全部自己写，只吃「索引表 + 形状表 + 译文」。
 
 输入
-  data/msg_index.json     容器索引（BMG 名、条数、entrySize、groupID、MID1、条目属性、尾部块）
-  译文                     从输入归档按生产几何解码（`patch_sjis_text` 的口径）
-  原样带过的两块           FLW1/FLI1 流脚本（无正文文本）、zel_unit.bmg 单位标签表
+  data/msg_index.json        容器索引（BMG 名、条数、entrySize、groupID、MID1、条目属性、尾部块）
+  data/text_resources.json   文本资源形状（哪些资源、每格叫什么）
+  cn/texts.csv               译文（`key` + `zh-Hans`）
+  原样带过的块               FLW1/FLI1 流脚本（无正文文本）
 
 输出
   work/scratch_parts/bmgres*.arc   Yaz0 压的 RARC，可直接被 build_sjis_pack.py 打包
   work/code_map.json               字符 -> 新码位（字库生成器读同一份）
 
 自己写的东西：MESG 头、INF1（每条 = 偏移 + message_id + 属性，见 docs「消息属性」）、
-DAT1（布局自定，不再受原始槽位容量限制）、MID1（消息号列表）、RARC（含名字哈希）。
+DAT1（布局自定）、MID1（消息号列表）、STR1（短串表的字符串池）、RARC（含名字哈希）。
 """
 
 import json
@@ -28,102 +29,51 @@ import paths
 import patch_sjis_font as PSF
 import patch_sjis_text as PST
 import rarc
+import text_resources as TR
+import texts
 import yaz0
 
 INDEX_JSON = os.path.join(paths.DATA, "msg_index.json")
 CODE_JSON = os.path.join(paths.WORK, "code_map.json")
 ENCODING = 3
-PASSTHROUGH = ("zel_unit.bmg",)   # 原样带过：单位标签表（15 组短串），见 docs
 
+TEXTS = paths.cli("--texts") or texts.FILE
 SPACE = paths.cli("--code-space") or "own"     # own=自分配码位；sjis=沿用现有字库的码位
 OUT_DIR = os.path.join(paths.WORK, "scratch_parts" if SPACE == "own" else "scratch_parts.%s" % SPACE)
 
 
-def rarc_files(arc):
-    """{归档内文件名: 数据}。"""
-    hlen, fdoff = struct.unpack_from(">I", arc, 8)[0], struct.unpack_from(">I", arc, 0x0C)[0]
-    _, _, nfiles, fileoff, stlen, stoff = struct.unpack_from(">IIIIII", arc, 0x20)
-    strtab = arc[0x20 + stoff : 0x20 + stoff + stlen]
-    data = 0x20 + fdoff
-    out = {}
-    for i in range(nfiles):
-        o = 0x20 + fileoff + i * 0x14
-        fid, nh, tfno, doff, dsize = struct.unpack_from(">HHIII", arc, o)
-        if tfno >> 24 != 0x11:
-            continue
-        noff = tfno & 0xFFFFFF
-        name = strtab[noff : strtab.index(b"\x00", noff)].decode()
-        out[name] = arc[data + doff : data + doff + dsize]
-    return out
+def block(tag, payload):
+    """段 = tag + u32 段长 + 载荷，段长按 0x20 对齐。"""
+    raw = 8 + len(payload)
+    size = rarc.align_up(raw)
+    return tag + struct.pack(">I", size) + payload + b"\x00" * (size - raw)
 
 
-def slots(blob):
-    """({DAT1 槽起点: token 列表}, [(消息下标, 槽起点)])：按生产几何切。"""
-    off = blob.find(b"MESG")
-    size = struct.unpack_from(">I", blob, off + 8)[0]
-    inner = blob[off : off + size]
-    inf = next(s for s in PST.sections(inner) if s[0] == b"INF1")
-    dat = next(s for s in PST.sections(inner) if s[0] == b"DAT1")
-    nent, esize = struct.unpack_from(">HH", inner, inf[1] + 8)
-    dat_abs = off + dat[1] + 8
-    dat_end = off + dat[1] + dat[2]
-    offsets = [struct.unpack_from(">I", inner, inf[1] + 0x10 + k * esize)[0] for k in range(nent)]
-    starts = sorted(set(offsets))
-    nxt = {}
-    for i, s in enumerate(starts):
-        nxt[s] = starts[i + 1] if i + 1 < len(starts) else dat_end - dat_abs
-    texts = {}
-    for s in starts:
-        limit = dat_abs + nxt[s]
-        texts[s] = PST.decode(blob, dat_abs + s, limit - 2) if limit - (dat_abs + s) >= 2 else []
-    return texts, [(k, o) for k, o in enumerate(offsets)]
-
-
-def build_file(src, spec, texts, remap, default_names=False):
-    """重建一个 BMG 文件：正文块自造，尾部块（FLW1/FLI1）原样接上。"""
-    idx = slot_index(src, spec)                 # [(消息下标, DAT1 槽起点)]
+def build_messages(src, spec, resource, rows, remap, default_names=False):
+    """重建消息表：正文按 texts.csv 重排（每条一个槽），属性来自索引，尾部块原样接上。"""
     n, esize = spec["entries"], spec["entrySize"]
-
-    # MID1：每个消息的全局消息号列表（表里的纯数字）。子头 8 字节：条数(u16) + form/supplement(u16) + 4 字节填充
     ids = spec["mid1"]
     assert len(ids) == n, (len(ids), n)
-    mid = struct.pack(">HBB", n, 0, 0) + b"\x00" * 4 + b"".join(struct.pack(">I", i) for i in ids)
     attrs = expand_attrs(spec)                  # 条目属性（说话人/框样式/文字速度…）
     assert esize == 6 + len(attrs[0]), (esize, len(attrs[0]))
 
-    # 默认名（主角/马）走单字节码位：名字框逐字节取字，两字节码位会被拆坏（见 docs「名字与键盘」）
-    overrides = ({k: PST.default_name_bytes(v) for k, v in PST.NAME_MSG_OVERRIDES.items()}
-                 if default_names else {})
-
-    shared = {}                                 # 源槽起点 -> 新槽起点（未被覆盖的消息共享）
-    per_msg = {}                                # 消息号 -> 新槽起点（默认名单独占槽）
     dat = bytearray()
-    for k, o in idx:
-        if k in overrides:
-            per_msg[k] = len(dat)
-            dat += overrides[k] + b"\x00\x00"
-            continue
-        if o not in shared:
-            shared[o] = len(dat)
-            dat += PST.encode(texts[o], remap)
+    offsets = []
+    for k in range(n):
+        tokens = texts.parse_literal(rows["%s/%d" % (resource, ids[k])])
+        offsets.append(len(dat))
+        if default_names and k in PST.NAME_MSG_OVERRIDES:
+            # 名字框逐字节取字，默认名写单字节码位（见 docs「名字与键盘」）
+            dat += PST.default_name_bytes("".join(chr(t[1]) for t in tokens if t[0] == "chr"))
+            dat += b"\x00\x00"
+        else:
+            dat += PST.encode(tokens, remap)
 
-    def slot_at(k, o):
-        return per_msg[k] if k in per_msg else shared.get(o, 0)
-
-    inf = bytearray()
-    assert len(idx) == n, (len(idx), n)
-    for k, o in idx:
-        inf += struct.pack(">IH", slot_at(k, o), ids[k]) + attrs[k]
-
-    def block(tag, payload):
-        raw = 8 + len(payload)
-        size = rarc.align_up(raw)
-        return tag + struct.pack(">I", size) + payload + b"\x00" * (size - raw)
-
-    body = block(b"INF1", struct.pack(">HH", n, esize) + b"\x00" * 4 + bytes(inf))
+    inf = b"".join(struct.pack(">IH", offsets[k], ids[k]) + attrs[k] for k in range(n))
+    body = block(b"INF1", struct.pack(">HH", n, esize) + b"\x00" * 4 + inf)
     body += block(b"DAT1", bytes(dat))
-    if mid:
-        body += block(b"MID1", mid)
+    mid = struct.pack(">HBB", n, 0, 0) + b"\x00" * 4 + b"".join(struct.pack(">I", i) for i in ids)
+    body += block(b"MID1", mid)
 
     # 尾部块：按表逐个核对 tag/长度后原样接上（无正文文本，见 docs）
     # 原归档的文件项尺寸比块表小几个字节（末块的对齐留白落在文件区域外），缺的用 0 补
@@ -138,10 +88,41 @@ def build_file(src, spec, texts, remap, default_names=False):
         assert struct.unpack_from(">I", tail, p + 4)[0] == t["size"]
         p += t["size"]
 
-    blocks = 2 + (1 if mid else 0) + len(spec.get("tails", []))
+    blocks = 3 + len(spec.get("tails", []))
     head = (b"MESG" + b"bmg1" + struct.pack(">II", len(body), blocks)
             + bytes((ENCODING,)) + b"\x00" * 15)
     return head + body + tail
+
+
+def build_unit(src, spec, resource, shape, rows):
+    """重建短串表：STR1 自排，条目保留原有字段，只换字符串偏移。"""
+    secs = dict((t, (o, s)) for t, o, s in PST.sections(src))
+    inf, dat, str1 = secs.get(b"INF1"), secs.get(b"DAT1"), secs.get(b"STR1")
+    if not (inf and dat and str1) or shape.get("pool") != "STR1":
+        sys.exit("%s 的形状与归档不符（string_pairs 需要 INF1 + DAT1 + STR1）" % resource)
+    n, esize = struct.unpack_from(">HH", src, inf[0] + 8)
+    assert n == spec["entries"], (n, spec["entries"])
+
+    pool = bytearray()
+    entries = bytearray()
+    for k in range(n):
+        fields = list(struct.unpack_from(">" + "H" * (esize // 2), src, inf[0] + 0x10 + k * esize))
+        for name, field in shape["cells"].items():
+            key = "%s/%d/%s" % (resource, k, name)
+            tokens = texts.parse_literal(rows[key])
+            if any(t[0] != "chr" or t[1] == 0 for t in tokens):
+                sys.exit("%s 只放字符（不能有标签或空码位）" % key)
+            fields[field] = len(pool)
+            pool += b"".join(bytes((t[1] >> 8, t[1] & 0xFF)) for t in tokens)
+            pool += b"\x00\x00"
+        entries += struct.pack(">" + "H" * (esize // 2), *fields)
+
+    body = block(b"INF1", struct.pack(">HH", n, esize) + b"\x00" * 4 + bytes(entries))
+    body += block(b"DAT1", src[dat[0] + 8 : dat[0] + dat[1]])
+    body += block(b"STR1", bytes(pool))
+    head = (b"MESG" + b"bmg1" + struct.pack(">II", len(body), 3)
+            + bytes((src[0x10],)) + b"\x00" * 15)
+    return head + body
 
 
 def expand_attrs(spec):
@@ -166,8 +147,8 @@ def slot_index(src, spec):
             for k in range(nent)]
 
 
-def self_check(raw, spec):
-    """生成后自检：按引擎的取法验证 RARC 与 BMG（这次两个 bug 都该被它拦住）。"""
+def self_check(raw, spec, shapes):
+    """生成后自检：按引擎的取法验证 RARC 与 BMG。"""
     if not spec["files"]:
         return
     hlen, fdoff = struct.unpack_from(">I", raw, 8)[0], struct.unpack_from(">I", raw, 0x0C)[0]
@@ -188,11 +169,12 @@ def self_check(raw, spec):
         found[nm] = raw[data + doff : data + doff + dsize]
     for f in spec["files"]:
         assert f["name"] in found, "归档里取不到 %s" % f["name"]
-        blob = found[f["name"]]
-        if "entries" not in f or f["name"] in PASSTHROUGH:
+        if "entries" not in f:
             continue
+        blob = found[f["name"]]
         assert blob.find(b"MESG") == 0, "%s 不是 BMG" % f["name"]
-        p, n, esize, ids, dat1 = 0x20, None, None, None, None
+        shape = shapes[os.path.splitext(f["name"])[0]]["shape"]
+        p, n, esize, ids, dat1, pool = 0x20, None, None, None, None, None
         while p + 8 <= len(blob):
             tag = blob[p : p + 4]
             if not tag.isalnum():
@@ -203,27 +185,54 @@ def self_check(raw, spec):
                 assert (n, esize) == (f["entries"], f["entrySize"]), "INF1 头不对"
             if tag == b"DAT1":
                 dat1 = size - 8
+            if tag == b"STR1":
+                pool = size - 8
             if tag == b"MID1":
                 num = struct.unpack_from(">H", blob, p + 8)[0]
                 ids = list(struct.unpack_from(">%dI" % num, blob, p + 16))
             p += size
             while p % 0x20:
                 p += 1
-        assert ids == f["mid1"], "%s 的 MID1 与表不一致" % f["name"]
         inf = blob.find(b"INF1")
-        attrs = expand_attrs(f)
-        for k in range(n):
-            off, eid = struct.unpack_from(">IH", blob, inf + 0x10 + k * esize)[0:2]
-            assert off < dat1, "%s 第 %d 条的 DAT1 偏移越界" % (f["name"], k)
-            assert eid == ids[k], "%s 第 %d 条的 message_id 与 MID1 不一致" % (f["name"], k)
-            assert blob[inf + 0x10 + k * esize + 6 : inf + 0x10 + (k + 1) * esize] == attrs[k], \
-                "%s 第 %d 条的属性字节不对" % (f["name"], k)
+        esize_h = esize // 2
+        if shape == "messages":
+            assert ids == f["mid1"], "%s 的 MID1 与表不一致" % f["name"]
+            attrs = expand_attrs(f)
+            for k in range(n):
+                off, eid = struct.unpack_from(">IH", blob, inf + 0x10 + k * esize)[0:2]
+                assert off < dat1, "%s 第 %d 条的 DAT1 偏移越界" % (f["name"], k)
+                assert eid == ids[k], "%s 第 %d 条的 message_id 与 MID1 不一致" % (f["name"], k)
+                assert blob[inf + 0x10 + k * esize + 6 : inf + 0x10 + (k + 1) * esize] == attrs[k], \
+                    "%s 第 %d 条的属性字节不对" % (f["name"], k)
+        else:
+            assert ids is None and pool, "%s 不应有 MID1 而应有 STR1" % f["name"]
+            for k in range(n):
+                fields = struct.unpack_from(">" + "H" * esize_h, blob, inf + 0x10 + k * esize)
+                for field in range(2, esize_h):
+                    assert fields[field] < pool, \
+                        "%s 第 %d 条的字符串偏移越界" % (f["name"], k)
 
 
 def main():
-    with open(INDEX_JSON, encoding="utf-8") as f:
-        table = json.load(f)
+    index, shapes = TR.load()
+    rows = texts.read(TEXTS)
+    cells = TR.cells(index, shapes)
+    expected = [key for _, _, _, _, key in cells]
+    unknown = sorted(set(rows) - set(expected))
+    missing = [key for key in expected if key not in rows]
+    if missing or unknown:
+        sys.exit("texts.csv 与索引不符：缺 %d 条%s；多 %d 条%s"
+                 % (len(missing), "（%s）" % "、".join(missing[:3]) if missing else "",
+                    len(unknown), "（%s）" % "、".join(unknown[:3]) if unknown else ""))
+
     sources = dict(material.msg_arcs())
+    for base in index:
+        if base not in sources:
+            sys.exit("cn/msg/ 里缺 %s" % base)
+    blobs = {}
+    for base, arc in sources.items():
+        for name, data in material.rarc_files(arc).items():
+            blobs[(base, name)] = data
 
     # ---- 第一遍：收集要编码的字符（译文 + 图标别名 + 默认名 + ※ + 键盘字表）
     chars, seen = [], set()
@@ -233,20 +242,10 @@ def main():
             seen.add(ch)
             chars.append(ch)
 
-    all_texts = {}
-    for base, spec in table.items():
-        if base not in sources:
-            continue
-        files = rarc_files(sources[base])
-        for f in spec["files"]:
-            if f["name"] in PASSTHROUGH or "entries" not in f or f["name"] not in files:
-                continue
-            texts, _ = slots(files[f["name"]])
-            all_texts[(base, f["name"])] = texts
-            for toks in texts.values():
-                for tok in toks:
-                    if tok[0] == "chr" and tok[1] >= 0x80:
-                        need(chr(tok[1]))
+    for key in expected:
+        for tok in texts.parse_literal(rows[key]):
+            if tok[0] == "chr" and tok[1] >= 0x80:
+                need(chr(tok[1]))
     for ch in PSF.ICON_ALIAS.values():
         need(chr(ch))
     for ch in PSF.NAME_DEFAULT_CHARS:
@@ -274,18 +273,25 @@ def main():
 
     # ---- 第二遍：逐归档重建
     os.makedirs(OUT_DIR, exist_ok=True)
-    for base, spec in sorted(table.items()):
-        files = rarc_files(sources[base]) if base in sources else {}
+    for base, spec in sorted(index.items()):
         w = rarc.Writer(os.path.splitext(base)[0])
         for f in spec["files"]:
-            if f["name"] in PASSTHROUGH or "entries" not in f:
-                w.add(f["name"], files[f["name"]])
+            if "entries" not in f:
+                w.add(f["name"], blobs[(base, f["name"])])
                 continue
-            w.add(f["name"], build_file(files[f["name"]], f, all_texts[(base, f["name"])],
-                                       remap, default_names=(f["name"] == "zel_00.bmg")))
+            resource = os.path.splitext(f["name"])[0]
+            shape = shapes[resource]
+            src = blobs[(base, f["name"])]
+            if shape["shape"] == "messages":
+                w.add(f["name"], build_messages(src, f, resource, rows, remap,
+                                                default_names=(f["name"] == "zel_00.bmg")))
+            elif shape["shape"] == "string_pairs":
+                w.add(f["name"], build_unit(src, f, resource, shape, rows))
+            else:
+                sys.exit("不认识的形状 %r（%s）" % (shape["shape"], resource))
         out = os.path.join(OUT_DIR, base)
         raw = w.build()
-        self_check(raw, spec)
+        self_check(raw, spec, shapes)
         with open(out, "wb") as fh:
             fh.write(yaz0.encode(raw))
         print("  %-14s %d 文件 -> %d 字节" % (base, len(spec["files"]), os.path.getsize(out)))

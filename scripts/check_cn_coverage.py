@@ -1,4 +1,10 @@
-import glob
+"""看译文用到哪些字符、原字库能不能渲染：判断保留原字库位图的变体（--variant bmp）能不能画全。
+
+译文取自 `cn/texts.csv` 的译文列（字面语法见 scripts/texts.py），字库取
+`cn/font/rodan_b_24_22.bfn`（原字库）的 MAP1。
+"""
+
+import csv
 import os
 import struct
 import sys
@@ -7,9 +13,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import bfn_repack as R
+import paths
+import texts
 
-FONT = os.path.join(os.path.dirname(HERE), "cn", "font", "rodan_b_24_22.bfn")
-TEXT = os.path.join(os.path.dirname(HERE), "cn", "text", "*.txt")
+FONT = os.path.join(paths.CN, "font", "rodan_b_24_22.bfn")
 
 
 def load_maps(bfn):
@@ -54,13 +61,12 @@ def main():
         print("MAP1 method=%d start=%#x end=%#x entries=%d" % (m["method"], m["start"], m["end"], m["entries"]))
 
     counts = {}
-    for p in sorted(glob.glob(TEXT)):
-        for line in open(p, encoding="utf-8"):
-            if line.startswith("#") or "\t" not in line:
-                continue
-            text = line.rstrip("\n").split("\t", 2)[2].replace("\\n", "\n")
-            for ch in text:
-                counts[ord(ch)] = counts.get(ord(ch), 0) + 1
+    with open(texts.FILE, encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        for rec in reader:
+            for tok in texts.parse_literal(rec[texts.COL_LOCALE]):
+                if tok[0] == "chr":
+                    counts[tok[1]] = counts.get(tok[1], 0) + 1
 
     total = sum(counts.values())
     distinct = len(counts)
