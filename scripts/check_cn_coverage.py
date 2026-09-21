@@ -1,5 +1,6 @@
 """看译文用到哪些字符、原字库能不能渲染：判断保留原字库位图的变体（--variant bmp）能不能画全。
 
+只统计就地改写路线会重建的格（`messages` 形状的消息表）；保留原字库位图时短串表是原样带过的，不算在内。
 译文取自 `cn/texts.csv` 的译文列（字面语法见 scripts/texts.py），字库取
 `cn/font/rodan_b_24_22.bfn`（原字库）的 MAP1。
 """
@@ -14,6 +15,7 @@ sys.path.insert(0, HERE)
 
 import bfn_repack as R
 import paths
+import text_resources as TR
 import texts
 
 FONT = os.path.join(paths.CN, "font", "rodan_b_24_22.bfn")
@@ -60,10 +62,14 @@ def main():
     for m in maps:
         print("MAP1 method=%d start=%#x end=%#x entries=%d" % (m["method"], m["start"], m["end"], m["entries"]))
 
+    index, shapes = TR.load()
+    messages = {key for _, _, _, shape, key in TR.cells(index, shapes) if shape["shape"] == "messages"}
     counts = {}
     with open(texts.FILE, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         for rec in reader:
+            if rec[texts.COL_KEY] not in messages:
+                continue
             for tok in texts.parse_literal(rec[texts.COL_LOCALE]):
                 if tok[0] == "chr":
                     counts[tok[1]] = counts.get(tok[1], 0) + 1
