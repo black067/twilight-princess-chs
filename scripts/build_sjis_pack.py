@@ -74,7 +74,7 @@ def check_meta(meta):
     if problems:
         for line in problems:
             print("  - %s" % line, file=sys.stderr)
-        sys.exit("元数据没通过本地校验：改 %s 里的 mod / mod_ique" % paths.CONFIG_EXAMPLE)
+        sys.exit("元数据没通过本地校验：改 %s 里的 mod / mod_bmp" % paths.CONFIG_EXAMPLE)
 
 
 def print_meta(meta):

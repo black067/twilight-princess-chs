@@ -18,10 +18,10 @@ CONFIG_EXAMPLE = os.path.join(HERE, "config.example.json")
 
 # 两个成品变体：(变体名, config 里的元信息段)。字库部件目录也在 work 下由这里定，
 # 字库/打包/安装脚本共用，避免各写一份。
-VARIANTS = (("open", "mod"), ("ique", "mod_ique"))
+VARIANTS = (("open", "mod"), ("bmp", "mod_bmp"))
 # 对外发布的变体；另一个变体（保留原字库位图）只在本机用 --variant 打
 PUBLISHED_VARIANTS = ("open",)
-PARTS_DIR = {"open": "sjis_parts", "ique": "sjis_parts.ique"}
+PARTS_DIR = {"open": "sjis_parts", "bmp": "sjis_parts.bmp"}
 # 字库部件文件名：不带槽位，同一个部件要写进各地区的 Font<region> 目录
 FONT_PART_NAMES = ("fontres.arc", "rubyres.arc")
 
@@ -236,7 +236,7 @@ def out_dir():
 
 
 def mod_meta(variant, region, language):
-    """变体在某地区的元信息：config 的 mod / mod_ique 段展开占位符。"""
+    """变体在某地区的元信息：config 的 mod / mod_bmp 段展开占位符。"""
     key = dict(VARIANTS)[variant]
     meta = config_value(key)
     if not isinstance(meta, dict) or not meta.get("id"):

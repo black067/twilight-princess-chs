@@ -1,7 +1,7 @@
 """把 dist 里的成品包装进游戏目录。
 
   python scripts/install.py --region us                 # 装美版盘（开源字体包）
-  python scripts/install.py --region jp --variant ique  # 装日版盘（保留原字库位图的包）
+  python scripts/install.py --region jp --variant bmp   # 装日版盘（保留原字库位图的包）
   python scripts/install.py --list                      # 只看现状
 
 mod 目录与游戏配置用 --mods-dir / --game-config，或 config 的 mods_dir / game_config
