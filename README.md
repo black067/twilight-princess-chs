@@ -13,7 +13,7 @@
 
 | 路径 | 内容 |
 | --- | --- |
-| `scripts/` | 提取与移植管线（22 个 Python 脚本，只用标准库） |
+| `scripts/` | 提取与移植管线（22 个 Python 脚本，只用标准库；外部路径见 `config.example.json`） |
 | `data/` | 入库的小数据：`name_keyboard.json` |
 | `docs/` | 逆向研究报告 |
 | `cn-mod/` | 引擎侧探针（只当仪器用，正式修复走数据侧） |
@@ -26,12 +26,12 @@
 
 ## 复现
 
-外部路径由 `scripts/paths.py` 统一解析：`--pak` / `--pak-old` / `--game-dir` / `--exe`，
-或环境变量 `TP_PAK` / `TP_PAK_OLD` / `TP_GAME_DIR` / `TP_DUSKLIGHT_EXE`。
+外部路径统一写在 `scripts/config.json`（不入库，照同目录的 `config.example.json` 填一份即可），
+个别路径可用 `--pak` / `--pak-old` / `--game-dir` / `--exe` 临时覆盖。
+替换槽位同样在配置里：`region`（字库目录 `Font<region>`，us/eu/jp）与 `language`
+（消息目录 `Msg<language>`，uk/us/de/fr/sp/it/jp），默认 `eu`/`fr`（欧版法语槽）。
 
 ```pwsh
-$env:TP_PAK = '<pak 路径>'
-
 # 1) 读 pak
 python scripts/extract_index.py <pak> work/index_new.bin          # 解密索引
 python scripts/list_index.py   work/index_new.bin Msgcn Fontcn    # 按目录/关键字找条目
@@ -43,7 +43,7 @@ python scripts/export_cn_archive.py        # 文本 + 字库
 python scripts/export_cn_text.py           # 标签感知的文本导出
 python scripts/check_cn_coverage.py        # 文本码位 vs 字库覆盖核对
 
-# 3) 移植管线，产出 work/mods/cn_text_sjis.dusk
+# 3) 移植管线，产出配置 out 目录下的 <mod id>.dusk（默认 dist/zh_hans.dusk）
 python scripts/extract_name_keyboard.py    # 键盘字表 → data/name_keyboard.json（已随仓库提供，会自动跳过）
 python scripts/sjis_map.py                 # 码位映射 → work/sjis_map.json
 python scripts/patch_sjis_font.py          # 字库单页重打包 + 映射 + 别名
@@ -56,14 +56,14 @@ python scripts/build_sjis_pack.py          # 组装成品包
 
 运行环境是 [dusklight](https://github.com/TwilitRealm/dusklight)（黄昏公主的 PC 重实现），
 本项目在 [snnh/dusk-cn](https://github.com/snnh/dusk-cn)（其中文增强分支，release v2.0.0）上验证。
-游戏镜像需自备正版：本项目跑的是 GameCube 欧版，`game.language = 2` 即它的法语槽。
+游戏镜像需自备正版：本项目在 GameCube 欧版上验证，`game.language = 2` 即它的法语槽；换 dump/槽位见「复现」里的 `region`/`language`。
 
 1. 取 dusk-cn 的 release 解压到游戏目录（便携模式下数据写在 `game/data/`）。
-2. 把 `cn_text_sjis.dusk` 放进 `<游戏目录>/data/mods/`。
+2. 把构建出的成品包（默认 `dist/zh_hans.dusk`）放进 `<游戏目录>/data/mods/`。
    `.dusk` 是个 zip：`mod.json`（其 `id` 决定开关名）+ `overlay/<光盘内路径>`，加载时按光盘路径覆盖同名文件。
-3. 改 `<游戏目录>/data/config.json`：`mod.cn_text_sjis.enabled` 与 `game.enableChineseNameKeyboard` 置 `true`、
+3. 改 `<游戏目录>/data/config.json`：`mod.zh_hans.enabled` 与 `game.enableChineseNameKeyboard` 置 `true`、
    `game.language` 置 `2`，其它 CN 相关 mod 全置 `false`（它们覆盖的是同一批文件）。
-   跑 `python scripts/build_sjis_pack.py --game-dir <游戏目录>` 会自动完成第 2、3 步，`game.language` 仍需自己设。
+   跑 `python scripts/build_sjis_pack.py` 会自动完成第 2、3 步，`game.language` 仍需自己设。
 4. 验证：标题提示、存档界面、对话、菜单、栏位文字应为简体中文，名字输入界面用翻页键切中文页；
    日志在 `%APPDATA%\TwilitRealm\Dusklight\logs\`。
 5. 旧存档里的名字存的是旧码位，会显示成错字：新建存档，或重新输入一次名字。

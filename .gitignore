@@ -5,6 +5,7 @@
 /cn/mods/
 /dist/
 /no-vcs/
+/scripts/config.json
 
 .venv/
 *.log

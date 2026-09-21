@@ -164,13 +164,13 @@ def check_name_keyboard(orig, fm):
 def main():
     with open(os.path.join(paths.WORK, "sjis_map.json"), encoding="utf-8") as f:
         orig = {int(c, 16): int(i, 16) for c, i in json.load(f)["font_entries"]}
-    fm = font_map(os.path.join(PARTS, "res_Fonteu_fontres.arc"))
+    fm = font_map(os.path.join(PARTS, "res_%s_fontres.arc" % paths.font_dir()))
     fc = set(fm)
     print("字库码位: %d" % len(fc))
     tot = collections.Counter()
     tot_missing = collections.Counter()
     msgs = 0
-    for n in sorted(x for x in os.listdir(PARTS) if x.startswith("res_Msgfr_")):
+    for n in sorted(x for x in os.listdir(PARTS) if x.startswith("res_%s_" % paths.msg_dir())):
         r = scan(os.path.join(PARTS, n), fc)
         if r is None or r.get("empty"):
             continue

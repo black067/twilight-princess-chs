@@ -21,8 +21,8 @@ NAME_KEYBOARD = os.path.join(paths.DATA, "name_keyboard.json")
 OUT_DIR = os.path.join(paths.WORK, "sjis_parts")
 
 FONT_SLOTS = {
-    "res/Fontcn/fontres.arc": "res/Fonteu/fontres.arc",
-    "res/Fontcn/rubyres.arc": "res/Fonteu/rubyres.arc",
+    "res/Fontcn/fontres.arc": "res/%s/fontres.arc" % paths.font_dir(),
+    "res/Fontcn/rubyres.arc": "res/%s/rubyres.arc" % paths.font_dir(),
 }
 
 SHIFT_JIS_FONT_TYPE = 2

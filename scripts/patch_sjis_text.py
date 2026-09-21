@@ -17,7 +17,7 @@ from list_index import entries
 
 MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
 OUT_DIR = os.path.join(paths.WORK, "sjis_parts")
-TARGET_LANG = "Msgfr"
+TARGET_LANG = paths.msg_dir()
 
 SHIFT_JIS_ENCODING = 3
 TAG = 0x1A

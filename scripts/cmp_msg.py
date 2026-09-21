@@ -64,21 +64,23 @@ def show(tag, blob, off, ids):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dusk", default=os.path.join(os.path.dirname(HERE), "work", "mods", "cn_text_fr.dusk"))
-    ap.add_argument("--entry", default="overlay/res/Msgfr/bmgres.arc")
+    ap.add_argument("--dusk", help="成品包，默认取 config 的 out/<mod id>.dusk")
+    ap.add_argument("--entry", help="包内条目，默认 overlay/<消息目录>/bmgres.arc")
     ap.add_argument("--ids", default="99,100,101,102,175")
     ap.add_argument("--pak-entry", default="res/Msgcn/bmgres.arc")
     args = ap.parse_args()
     ids = [int(x) for x in args.ids.split(",")]
+    dusk = args.dusk or paths.mod_path()
+    entry = args.entry or "/".join(("overlay", "res", paths.msg_dir(), "bmgres.arc"))
 
-    with zipfile.ZipFile(args.dusk) as z:
+    with zipfile.ZipFile(dusk) as z:
         names = z.namelist()
-        raw = z.read(args.entry)
-    print("dusk=%s names=%d" % (os.path.basename(args.dusk), len(names)))
+        raw = z.read(entry)
+    print("dusk=%s names=%d" % (os.path.basename(dusk), len(names)))
     blob = yaz0.decompress(raw)
     off = blob.find(b"MESG")
     print("  yaz0ed=%d bytes, MESG@%#x" % (len(blob), off))
-    show("PACK " + args.entry, blob, off, ids)
+    show("PACK " + entry, blob, off, ids)
 
     pak = paths.pak()
     with open(pak, "rb") as f:

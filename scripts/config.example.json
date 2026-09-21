@@ -1,0 +1,16 @@
+{
+    "pak": "<**版 **_prd.pak 的路径（官中文本/字库在这个包里）>",
+    "pak_old": "<旧版样本 **_prd.pak 的路径，仅差分对照用，可留空>",
+    "game_dir": "<dusklight 游戏目录，需要其中已有 data/config.json>",
+    "dusklight_exe": "<dusklight.exe 的路径，仅扫符号用，可留空>",
+    "out": "dist",
+    "region": "eu",
+    "language": "fr",
+    "mod": {
+        "id": "zh.hans",
+        "name": "Localization - Chinese (Simplified)",
+        "version": "1.0.0",
+        "author": "Yiga Clan",
+        "description": "塞尔达传说：黄昏公主中文本地化 Mod，替换{region}版的{language}，感谢 ** 神游"
+    }
+}
