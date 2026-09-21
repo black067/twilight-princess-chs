@@ -94,8 +94,12 @@ def build_messages(src, spec, resource, rows, remap, default_names=False):
     return head + body + tail
 
 
-def build_unit(src, spec, resource, shape, rows):
-    """重建短串表：STR1 自排，条目保留原有字段，只换字符串偏移。"""
+def build_unit(src, spec, resource, shape, rows, remap):
+    """重建短串表：STR1 自排，条目保留原有字段，只换两个字符串偏移。
+
+    标签由引擎拼成 `"%d %s"` 插进消息串（`dMsgUnit_c::setTag`），所以跟正文一样编码：
+    ASCII 与换行 1 字节、其余查码位表后 2 字节，`0000` 收尾。
+    """
     secs = dict((t, (o, s)) for t, o, s in PST.sections(src))
     inf, dat, str1 = secs.get(b"INF1"), secs.get(b"DAT1"), secs.get(b"STR1")
     if not (inf and dat and str1) or shape.get("pool") != "STR1":
@@ -108,13 +112,9 @@ def build_unit(src, spec, resource, shape, rows):
     for k in range(n):
         fields = list(struct.unpack_from(">" + "H" * (esize // 2), src, inf[0] + 0x10 + k * esize))
         for name, field in shape["cells"].items():
-            key = "%s/%d/%s" % (resource, k, name)
-            tokens = texts.parse_literal(rows[key])
-            if any(t[0] != "chr" or t[1] == 0 for t in tokens):
-                sys.exit("%s 只放字符（不能有标签或空码位）" % key)
+            tokens = texts.parse_literal(rows["%s/%d/%s" % (resource, k, name)])
             fields[field] = len(pool)
-            pool += b"".join(bytes((t[1] >> 8, t[1] & 0xFF)) for t in tokens)
-            pool += b"\x00\x00"
+            pool += PST.encode(tokens, remap)
         entries += struct.pack(">" + "H" * (esize // 2), *fields)
 
     body = block(b"INF1", struct.pack(">HH", n, esize) + b"\x00" * 4 + bytes(entries))
@@ -286,7 +286,7 @@ def main():
                 w.add(f["name"], build_messages(src, f, resource, rows, remap,
                                                 default_names=(f["name"] == "zel_00.bmg")))
             elif shape["shape"] == "string_pairs":
-                w.add(f["name"], build_unit(src, f, resource, shape, rows))
+                w.add(f["name"], build_unit(src, f, resource, shape, rows, remap))
             else:
                 sys.exit("不认识的形状 %r（%s）" % (shape["shape"], resource))
         out = os.path.join(OUT_DIR, base)

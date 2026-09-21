@@ -16,7 +16,6 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 import codes
-import export_texts as ET
 import material
 import patch_sjis_font as PSF
 import patch_sjis_text as PST
@@ -68,6 +67,21 @@ def message_cells(blob, spec, resource, rev):
     return out
 
 
+def pair_cells(blob, resource, shape, rev):
+    """{key: token 列表}：短串表按引擎路径解（标签同正文一样编码，由 `%d %s` 拼进消息串）。"""
+    secs = dict((t, (o, s)) for t, o, s in PST.sections(blob))
+    inf, str1 = secs[b"INF1"], secs[b"STR1"]
+    n, esize = struct.unpack_from(">HH", blob, inf[0] + 8)
+    pool_abs, pool_end = str1[0] + 8, str1[0] + str1[1]
+    out = {}
+    for k in range(n):
+        fields = struct.unpack_from(">" + "H" * (esize // 2), blob, inf[0] + 0x10 + k * esize)
+        for name, field in shape["cells"].items():
+            key = "%s/%d/%s" % (resource, k, name)
+            out[key] = engine_tokens(blob, pool_abs + fields[field], pool_end, rev)
+    return out
+
+
 def normalize(tokens):
     """把打包时的有意改写折算回 CSV 的写法。"""
     out = []
@@ -102,7 +116,7 @@ def main():
             if shape["shape"] == "messages":
                 cells = message_cells(blobs[f["name"]], f, resource, rev)
             else:
-                cells = ET.file_cells(blobs[f["name"]], resource, shape, f)
+                cells = pair_cells(blobs[f["name"]], resource, shape, rev)
             for key, tokens in cells.items():
                 total += 1
                 got = texts.format_tokens(normalize(tokens))
