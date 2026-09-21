@@ -1,4 +1,8 @@
-"""对照校验：把 work/sjis_parts 的部件按引擎口径解回字面串，与 cn/texts.csv 逐格比。
+"""对照校验：把变体自己那份部件按引擎口径解回字面串，与 cn/texts.csv 逐格比。
+
+跑哪个变体由 --variant 定（不给时 open）：open 的部件在 `work/sjis_parts`、比译文列 `zh-Hans`
+（码位表 `work/code_map.json`）；origin 的部件在 `work/sjis_parts.origin`、比官方原文列 `cn`
+（码位沿用官方字库的 Unicode 码位，搬过的查 `work/sjis_map.json` 的 remap）。
 
 引擎路径：非前导字节吃 1 字节、前导字节（0x81–0x9F / 0xE0–0xFC）吃 2 字节、
 `0x1A` 后跟 1 字节长度是标签。打包时有两处有意改写，比较前统一：
@@ -7,6 +11,7 @@
   默认名的单字节码位（0xA1–0xA5） -> 表里对应的汉字
 """
 
+import json
 import os
 import struct
 import sys
@@ -17,6 +22,7 @@ sys.path.insert(0, HERE)
 
 import codes
 import material
+import paths
 import patch_sjis_font as PSF
 import patch_sjis_text as PST
 import text_resources as TR
@@ -95,11 +101,26 @@ def normalize(tokens):
     return out
 
 
+def reverse_map(variant):
+    """码位 -> 字面字符：open 用自分配码位表；origin 的码位就是 Unicode 码位，只查搬过的那批。"""
+    if variant == paths.OPEN_VARIANT:
+        return {code: ch for ch, code
+                in codes.load(os.path.join(ROOT, "work", "code_map.json")).items()}
+    with open(os.path.join(ROOT, "work", "sjis_map.json"), encoding="utf-8") as f:
+        remap = json.load(f)["remap"]
+    return {int(new, 16): chr(int(old, 16)) for old, new in remap.items()}
+
+
 def main():
+    variant = paths.cli("--variant") or paths.OPEN_VARIANT
+    if variant not in paths.PARTS_DIR:
+        sys.exit("--variant 只支持 %s" % " / ".join(paths.PARTS_DIR))
     index, shapes = TR.load()
-    want = texts.read(texts.FILE)
-    rev = {code: ch for ch, code in codes.load(os.path.join(ROOT, "work", "code_map.json")).items()}
-    parts = os.path.join(ROOT, "work", "sjis_parts")
+    want = texts.read(texts.FILE, texts.COL_LOCALE if variant == paths.OPEN_VARIANT
+                      else texts.COL_SOURCE)
+    rev = reverse_map(variant)
+    parts = paths.parts_dir(variant)
+    print("变体 %s：部件 %s，对照 %s" % (variant, parts, texts.FILE))
 
     bad = []
     total = 0

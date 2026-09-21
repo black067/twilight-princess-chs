@@ -1,7 +1,7 @@
 """把 dist 里的成品包装进游戏目录。
 
-  python scripts/install.py --region us                 # 装美版盘（开源字体包）
-  python scripts/install.py --region jp --variant bmp   # 装日版盘（保留原字库位图的包）
+  python scripts/install.py --region us                    # 装美版盘（开源字体包）
+  python scripts/install.py --region jp --variant origin   # 装日版盘（保留原字库位图的包）
   python scripts/install.py --list                      # 只看现状
 
 mod 目录与游戏配置用 --mods-dir / --game-config，或 config 的 mods_dir / game_config
@@ -86,7 +86,7 @@ def main():
             print("  %-30s id=%-24s %s%s" % (name, mod_id or "(读不到)", state, mark))
         return
 
-    variant = str(paths.cli("--variant") or "open").lower()
+    variant = str(paths.cli("--variant") or paths.OPEN_VARIANT).lower()
     if variant not in dict(paths.VARIANTS):
         sys.exit("--variant 只支持 %s" % " / ".join(v for v, _ in paths.VARIANTS))
     region, language = paths.pick_disc(paths.cli("--region"))

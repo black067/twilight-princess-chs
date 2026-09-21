@@ -369,7 +369,7 @@ def main():
         json.dump(tables, f, ensure_ascii=False, indent=1)
     print("wrote %s" % KB_JSON)
     print("下一步：把 %s/*.arc 拷进 %s 再打包（diag_pack.py 会核键盘每一格）"
-          % (OUT_DIR, paths.parts_dir("open")))
+          % (OUT_DIR, paths.parts_dir(paths.OPEN_VARIANT)))
 
 
 main()

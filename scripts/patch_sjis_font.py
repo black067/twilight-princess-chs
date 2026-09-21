@@ -224,8 +224,9 @@ def main():
             sys.exit("--glyph-source 只支持 original 或 open[:<ttf>]：%s" % source)
         cli_ttf = source.split(":", 1)[1] if ":" in source else None
     cli_em = paths.option("--em")
-    # original 只产出 bmp 变体（字节回归/预览用）；否则一次产出两个
-    wanted = ("bmp",) if source == "original" else tuple(v for v, _ in paths.VARIANTS)
+    # original 字库只产出 origin 变体（字节回归/预览用）；否则一次产出两个
+    wanted = ((paths.ORIGIN_VARIANT,) if source == "original"
+              else tuple(v for v, _ in paths.VARIANTS))
 
     # 两套字库的 arc 只读一次，两个变体共用
     arcs = material.font_arcs()
@@ -244,11 +245,11 @@ def main():
             json.dump(kb_tables, f, ensure_ascii=False, indent=1)
         print("wrote %s" % KB_JSON)
     else:
-        print("跳过 %s（本次没跑 open 变体）" % KB_JSON)
+        print("跳过 %s（本次没跑 %s 变体）" % (KB_JSON, paths.OPEN_VARIANT))
 
 
 def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
-    """组装一个变体的两套字库：open 重渲染字形并补键盘格，bmp 只重排原始位图 + 别名。"""
+    """组装一个变体的两套字库：open 重渲染字形并补键盘格，origin 只重排原始位图 + 别名。"""
     renderers = {}
     try:
         for dst in paths.FONT_PART_NAMES:
@@ -256,11 +257,11 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
             name = os.path.splitext(os.path.basename(dst))[0]
             renderer = None
             em = gamma = 0.0
-            if variant == "open":
+            if variant == paths.OPEN_VARIANT:
                 ttf, em, gamma = font_settings(name, cli_ttf, cli_em)
                 if not ttf or not os.path.exists(ttf):
-                    sys.exit("open 需要字体文件：config.json 的 fonts.%s.file，或 "
-                             "--glyph-source open:<ttf>" % name)
+                    sys.exit("%s 需要字体文件：config.json 的 fonts.%s.file，或 "
+                             "--glyph-source open:<ttf>" % (paths.OPEN_VARIANT, name))
                 if ttf not in renderers:
                     renderers[ttf] = font.Renderer(ttf)
                 renderer = renderers[ttf]
@@ -304,7 +305,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
             pal_aliases, pal_chars = ((), {}) if not renderer else \
                 pal_keyboard_aliases(orig_glyph, pool)
             new_chars.update(pal_chars)
-            # 默认名单字节别名两个变体都要（bmp 直接指向原始字形，无需重渲染）
+            # 默认名单字节别名两个变体都要（origin 直接指向原始字形，无需重渲染）
             name_aliases = name_default_aliases(orig_glyph)
 
             if renderer and new_chars:
@@ -342,7 +343,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
             print("   wrote %s (arc %d -> %d bytes, yaz0 %d bytes)"
                   % (os.path.basename(path), len(arc), len(new_arc), os.path.getsize(path)))
             if not renderer:
-                continue    # bmp 变体不做键盘补全，那份表属于 open 变体
+                continue    # origin 变体不做键盘补全，那份表属于 open 变体
             kb_tables[os.path.splitext(os.path.basename(dst))[0]] = {
                 "aliases": [["%04X" % c, "%04X" % i] for c, i in kb_aliases],
                 "new_chars": {"%04X" % i: ch for i, ch in sorted(new_chars.items())},

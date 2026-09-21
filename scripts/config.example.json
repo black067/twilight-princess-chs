@@ -35,8 +35,8 @@
         "icon": "assets/icon.png",
         "banner": "assets/banner.png"
     },
-    "mod_bmp": {
-        "id": "yiga.zh.hans.bmp.{region}",
+    "mod_origin": {
+        "id": "yiga.zh.hans.{region}.orig",
         "name": "Chinese (Simplified) Translation (bitmap font)",
         "version": "1.0.0",
         "author": "Yiga Clan",

@@ -14,7 +14,7 @@ import material
 from patch_sjis_font import NAME_DEFAULT_BASE, NAME_DEFAULT_CHARS
 
 MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
-OUT_DIR = paths.parts_dir("open")    # 文本部件两个变体共用，落在 open 的部件目录
+OUT_DIR = paths.parts_dir(paths.ORIGIN_VARIANT)   # 就地改写只出 origin 变体，文本部件落在它自己的目录
 
 SHIFT_JIS_ENCODING = 3
 TAG = 0x1A

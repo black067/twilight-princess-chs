@@ -16,18 +16,22 @@ CN = os.path.join(ROOT, "cn")
 CONFIG = os.path.join(HERE, "config.json")
 CONFIG_EXAMPLE = os.path.join(HERE, "config.example.json")
 
-# 两个成品变体：(变体名, config 里的元信息段)。字库部件目录也在 work 下由这里定，
-# 字库/打包/安装脚本共用，避免各写一份。
-VARIANTS = (("open", "mod"), ("bmp", "mod_bmp"))
+# 变体名（别的脚本读常量，别写字面量）：open = 容器与字库从零生成；
+# origin = 就地改写现有素材，保留原字库位图。
+OPEN_VARIANT = "open"
+ORIGIN_VARIANT = "origin"
+# 两个成品变体：(变体名, config 里的元信息段)
+VARIANTS = ((OPEN_VARIANT, "mod"), (ORIGIN_VARIANT, "mod_origin"))
 # 不带 --variant 时打的变体（其余变体要在命令行显式指定）
-PUBLISHED_VARIANTS = ("open",)
-PARTS_DIR = {"open": "sjis_parts", "bmp": "sjis_parts.bmp"}
+PUBLISHED_VARIANTS = (OPEN_VARIANT,)
+# 部件目录（字库 + 文本）也在 work 下由这里定：一个变体一个目录，两条路线各写各的
+PARTS_DIR = {OPEN_VARIANT: "sjis_parts", ORIGIN_VARIANT: "sjis_parts.origin"}
 # 字库部件文件名：不带槽位，同一个部件要写进各地区的 Font<region> 目录
 FONT_PART_NAMES = ("fontres.arc", "rubyres.arc")
 
 
 def parts_dir(variant):
-    """变体的字库部件目录（work/ 下）。"""
+    """变体的部件目录（work/ 下）：两条路线各出自己的字库与文本，不互相覆盖。"""
     return os.path.join(WORK, PARTS_DIR[variant])
 
 
@@ -36,9 +40,9 @@ def font_parts(variant):
     return [(n, os.path.join(parts_dir(variant), n)) for n in FONT_PART_NAMES]
 
 
-def text_parts():
-    """[(部件名, 路径)]：文本部件（两个变体共用，落在 open 的部件目录）。"""
-    d = parts_dir("open")
+def text_parts(variant):
+    """[(部件名, 路径)]：变体自己那份文本部件（码位空间与它的字库配套）。"""
+    d = parts_dir(variant)
     if not os.path.isdir(d):
         return []
     return [(n, os.path.join(d, n)) for n in sorted(os.listdir(d)) if n.startswith("bmgres")]
@@ -236,7 +240,7 @@ def out_dir():
 
 
 def mod_meta(variant, region, language):
-    """变体在某地区的元信息：config 的 mod / mod_bmp 段展开占位符。"""
+    """变体在某地区的元信息：展开 config 里它那段（VARIANTS 的第二项）的占位符。"""
     key = dict(VARIANTS)[variant]
     meta = config_value(key)
     if not isinstance(meta, dict) or not meta.get("id"):

@@ -1,6 +1,6 @@
 """texts.csv 的读写：一行 = BMG 里的一格文本。
 
-本模块只认两列：`key` 与译文列 `zh-Hans`。其余列不参与打包。
+本模块只认 `key` 与两个文本列：译文列 `zh-Hans`、原文列 `cn`。其余列不参与打包。
 
     key,zh-Hans
     zel_00/1,译文
@@ -28,6 +28,7 @@ import paths
 FILE = os.path.join(paths.CN, "texts.csv")
 COL_KEY = "key"
 COL_LOCALE = "zh-Hans"     # 译文列
+COL_SOURCE = "cn"          # 原文列（就地改写路线打包时对照它）
 
 TAG_RE = re.compile(r"<T([0-9a-f]{6})(?::([0-9a-f]*))?>")
 

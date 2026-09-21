@@ -64,7 +64,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--disc", help="地区（%s），决定默认成品包与包内消息目录"
                                     % " / ".join(paths.REGIONS))
-    ap.add_argument("--variant", default="open", choices=[v for v, _ in paths.VARIANTS])
+    ap.add_argument("--variant", default=paths.OPEN_VARIANT,
+                    choices=[v for v, _ in paths.VARIANTS])
     ap.add_argument("--dusk", help="成品包，默认取 config 的 out/<id>.dusk")
     ap.add_argument("--entry", help="包内条目，默认 overlay/res/<消息目录>/bmgres.arc")
     ap.add_argument("--ids", default="99,100,101,102,175")

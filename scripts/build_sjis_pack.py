@@ -27,6 +27,11 @@ VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 URL_RE = re.compile(r"https?://|www\.", re.IGNORECASE)
 
 
+# 缺部件时提示该先跑哪个脚本（按变体）
+FONT_STEP = {paths.OPEN_VARIANT: "build_bfn.py", paths.ORIGIN_VARIANT: "patch_sjis_font.py"}
+TEXT_STEP = {paths.OPEN_VARIANT: "build_bmg.py", paths.ORIGIN_VARIANT: "patch_sjis_text.py"}
+
+
 def select_fields(meta, variant):
     """取要处理的字段；config 段里的内部键不进包（icon/banner 是本地路径，打包时换成包内路径）。"""
     known = set(TEXT_FIELDS) | set(IMAGE_FIELDS)
@@ -74,7 +79,8 @@ def check_meta(meta):
     if problems:
         for line in problems:
             print("  - %s" % line, file=sys.stderr)
-        sys.exit("元数据没通过本地校验：改 %s 里的 mod / mod_bmp" % paths.CONFIG_EXAMPLE)
+        sys.exit("元数据没通过本地校验：改 %s 里的 %s"
+                 % (paths.CONFIG_EXAMPLE, " / ".join(key for _, key in paths.VARIANTS)))
 
 
 def print_meta(meta):
@@ -132,10 +138,10 @@ def overlay_entries(variant, region, language):
     fonts = paths.font_parts(variant)
     for name, path in fonts:
         if not os.path.exists(path):
-            sys.exit("缺字库部件 %s：先跑 patch_sjis_font.py" % path)
-    texts = paths.text_parts()
+            sys.exit("缺字库部件 %s：先跑 %s" % (path, FONT_STEP[variant]))
+    texts = paths.text_parts(variant)
     if not texts:
-        sys.exit("缺文本部件：先跑 patch_sjis_text.py（%s）" % paths.parts_dir("open"))
+        sys.exit("缺文本部件：先跑 %s（%s）" % (TEXT_STEP[variant], paths.parts_dir(variant)))
     return ([("overlay/res/%s/%s" % (paths.font_dir(region), n), p) for n, p in fonts]
             + [("overlay/res/%s/%s" % (paths.msg_dir(language), n), p) for n, p in texts])
 
