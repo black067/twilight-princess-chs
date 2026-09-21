@@ -1,7 +1,8 @@
 """验收判定：按引擎 ShiftJIS 路径解码包内文本，检查
   1) 消息是否会在中途被判为结束（对白切断）
   2) 画出来的码位是否都在补丁字库里（缺字）
-  3) 名字键盘（l_mojiZh）的 550 个码位是否都在字库里，且指向预期的字形
+  3) 名字键盘（l_mojiZh）550 格是否与构建产出的期望表（work/keyboard_aliases.json）
+     一致，且补全槽的像素非空
 
 引擎路径（源码）：
   parseCharacter_ShiftJIS: 首字节不是前导(0x81-0x9F/0xE0-0xFC) => 只吃 1 字节
@@ -19,7 +20,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import bfn_repack as R
-import patch_sjis_font as F
 import paths
 import yaz0
 
@@ -129,42 +129,54 @@ def scan(path, fc):
     }
 
 
-def check_name_keyboard(orig, fm):
-    """550 个键盘格子逐格核：补丁字库里该码位的字形与预期一致
-
-    预期按原始字库码表算——重映射后的码位会与别的字符的 Unicode 值撞车，
-    不能用补丁字库反查。
+def check_name_keyboard(path, fm):
+    """名字键盘 550 格逐格核对：
+    1) 补丁字库里该码位的字形与 patch_sjis_font 落盘的期望表一致；
+    2) 补全槽（新增渲染的格子）像素非空。
     """
-    with open(F.NAME_KEYBOARD, encoding="utf-8") as f:
-        codes = [int(c, 16) for c in json.load(f)["codes"]]
-    blank = orig[0x3000]
-    direct = variant = blanked = 0
+    kb_path = os.path.join(paths.WORK, "keyboard_aliases.json")
+    if not os.path.exists(kb_path):
+        print("名字键盘: 缺 %s（先跑 patch_sjis_font）" % kb_path)
+        return
+    with open(kb_path, encoding="utf-8") as f:
+        doc = json.load(f)
+    t = doc.get("fontres")
+    assert t, "keyboard_aliases.json 缺 fontres 表"
     bad = []
-    for code in codes:
-        char = bytes((code >> 8, code & 0xFF)).decode("shift_jis")
-        want = orig.get(ord(char))
-        if want is not None:
-            direct += 1
-        else:
-            target = F.NAME_VARIANT.get(char)
-            want = orig.get(ord(target)) if target else None
-            if want is not None:
-                variant += 1
-            else:
-                want = blank
-                blanked += 1
-        if fm.get(code) != want:
+    for code_s, idx_s in t["aliases"]:
+        code, idx = int(code_s, 16), int(idx_s, 16)
+        if fm.get(code) != idx:
             bad.append(code)
-    print("名字键盘: %d 格 (原字 %d / 换简体 %d / 空白 %d), 不符 %d"
-          % (len(codes), direct, variant, blanked, len(bad)))
+    print("名字键盘: %d 格 (原字 %d / 换简体 %d / 补全渲染 %d / 空白 %d), 不符 %d"
+          % (len(t["aliases"]), t["direct"], t["variant"], t["added"], t["blanked"], len(bad)))
     if bad:
         print("   不符码位: %s" % " ".join("%04X" % c for c in bad[:20]))
+    if not t["new_chars"]:
+        return
+    arc = yaz0.decompress(open(path, "rb").read())
+    _, body, blocks = R.parse_bfn(arc)
+    g = next(b for b in blocks if b[0] == b"GLY1")
+    fields = R.gly1_fields(body, g[1])
+    data = body[g[1] + 0x20 : g[1] + g[2]][: fields["textureSize"]]
+    tw, rows = fields["textureWidth"], fields["numRows"]
+    img = R.untile_i4(data, tw, fields["textureHeight"])
+    empty = []
+    for slot_s, ch in sorted(t["new_chars"].items()):
+        slot = int(slot_s, 16)
+        col, row = slot % rows, slot // rows
+        ink = 0
+        for y in range(fields["cellHeight"]):
+            base = (row * fields["cellHeight"] + y) * tw + col * fields["cellWidth"]
+            ink += sum(1 for v in img[base : base + fields["cellWidth"]] if v)
+        if not ink:
+            empty.append((slot, ch))
+    print("   补全槽像素: %d 槽，空字形 %d %s"
+          % (len(t["new_chars"]), len(empty), ["%#x:%s" % e for e in empty[:8]]))
 
 
 def main():
-    with open(os.path.join(paths.WORK, "sjis_map.json"), encoding="utf-8") as f:
-        orig = {int(c, 16): int(i, 16) for c, i in json.load(f)["font_entries"]}
-    fm = font_map(os.path.join(PARTS, "res_%s_fontres.arc" % paths.font_dir()))
+    fontres_path = os.path.join(PARTS, "res_%s_fontres.arc" % paths.font_dir())
+    fm = font_map(fontres_path)
     fc = set(fm)
     print("字库码位: %d" % len(fc))
     tot = collections.Counter()
@@ -184,7 +196,7 @@ def main():
     for c, n in tot_missing.most_common(20):
         print("   缺字码位 %04X x%-5d %s" % (c, n, chr(c) if 0x20 < c < 0xFFFF else "?"))
     print()
-    check_name_keyboard(orig, fm)
+    check_name_keyboard(fontres_path, fm)
 
 
 main()

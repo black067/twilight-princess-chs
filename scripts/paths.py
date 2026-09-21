@@ -22,6 +22,9 @@ KEYS = {
     "--pak-old": "pak_old",
     "--game-dir": "game_dir",
     "--exe": "dusklight_exe",
+    "--cn-font": "cn_font",
+    "--glyph-source": "glyph_source",
+    "--em": "em",
 }
 
 # 替换槽位：字库目录跟 region（Font<region>），消息目录跟 language（Msg<language>）
