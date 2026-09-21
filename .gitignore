@@ -5,6 +5,7 @@
 /cn/font/
 /cn/mods/
 /dist/
+/no-vcs/
 
 .venv/
 *.log
