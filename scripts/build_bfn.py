@@ -48,9 +48,8 @@ DEFAULT_METRICS = {"fontres": (42, 6, 42, 48), "rubyres": (43, 5, 48, 48)}
 # 部件名 -> 引擎按名字取的 BFN 名（mDoExt_initFont0/1 里写死）
 FONTS = (("fontres", "rodan_b_24_22.bfn"), ("rubyres", "reishotai_24_22.bfn"))
 
-# 引擎把半角 ASCII 转成全角码位时用的表（`JUTResFont::getFontCode` 的 halftofull；
-# 消息路径的 `change1ByteTo2Bytes` 也用同一批）。把这些码位也指到 ASCII 字形上，
-# 免得引擎转过的串在我们表里落空。
+# 引擎把半角 ASCII 转成全角码位时用的表（`JUTResFont::getFontCode` 里的同名字表）。
+# 把这些码位也指到 ASCII 字形上，免得哪条路径先转过就查不到字形。
 HALF_TO_FULL = (
     0x8140, 0x8149, 0x8168, 0x8194, 0x8190, 0x8193, 0x8195, 0x8166, 0x8169, 0x816A,
     0x8196, 0x817B, 0x8143, 0x817C, 0x8144, 0x815E, 0x824F, 0x8250, 0x8251, 0x8252,
