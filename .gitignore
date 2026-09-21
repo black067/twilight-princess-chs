@@ -1,0 +1,9 @@
+/apk/
+/extracted/
+/work/
+/cn/text/
+/cn/font/
+/cn/mods/
+*.log
+__pycache__/
+*.pyc

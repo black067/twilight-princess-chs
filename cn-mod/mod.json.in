@@ -1,0 +1,7 @@
+{
+  "id": "cn.font.fix",
+  "name": "CN text probe (J2DTextBox / font draw)",
+  "version": "@PROJECT_VERSION@",
+  "author": "Yiga Clan",
+  "description": "Diagnostic probe: logs J2DTextBox pane bytes and per-glyph font codes through pre-hooks only. Keep it disabled while Shift-JIS re-encoded data is active."
+}
