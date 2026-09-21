@@ -6,20 +6,21 @@
 > 官方素材（APK、pak、提取出的 `cn/text/` 与 `cn/font/`、打出来的 `.dusk` 成品包）**请自行准备**，用脚本从自备的正版 pak 获取
 
 **现状**：**版独有的官方简体中文文本与中文字库已完整提取，并且全部游戏内文本的中文已在 dusklight 上跑通——
-标题提示、存档界面、对话、菜单、栏位文字、电视设置页面都正常，主角名与马名正常，名字输入键盘可用。
+标题提示、存档界面、对话、菜单、栏位文字、电视设置页面都正常，主角名与马名正常，中文名字键盘可用（open 变体）。
 做法全程纯数据、不改引擎，细节见[研究报告](docs/研究报告.md)与下文。
 
 ## 仓库内容
 
 | 路径 | 内容 |
 | --- | --- |
-| `scripts/` | 提取与移植管线（Python，只用标准库；外部路径见 `config.example.json`） |
+| `scripts/` | 提取与移植管线（Python，只用标准库；外部路径见 `config.example.json`）。字库重渲染 `font_render.py` 走 Windows GDI+，**只支持 Windows** |
 | `data/` | 入库的小数据：`name_keyboard.json` |
 | `docs/` | 逆向研究报告 |
+| `tools/` | 配套工具：`dusklight-download/` 拉 dusklight / dusk-cn 的 release、启盘镜像 |
 | `cn-mod/` | 引擎侧探针（只当仪器用，正式修复走数据侧） |
-| `cn/text/`、`cn/font/` | 官方素材，由脚本现产 |
-| `dist/` | 打出来的 `.dusk` 成品包（开源字体版 / 官方字库版） |
-| `work/` | 中间数据：`sjis_parts*` 字库与文本部件、`fonts/` 开源字体、诊断脚本与缓存 |
+| `cn/text/`、`cn/font/` | 官方素材，由脚本现产（不入库） |
+| `dist/` | 打出来的 `.dusk` 成品包（开源字体版 / 官方字库版，不入库） |
+| `work/` | 中间数据：`sjis_parts*` 部件、`fonts/` 开源字体、`keyboard_aliases.json`、诊断脚本与缓存（不入库） |
 
 原始样本：新版 `The_Legend_of_Zelda_Twilight_Princess_**.**`，
 差分对照的旧版 `**.**`；哈希与尺寸见研究报告第 1 节。
@@ -36,6 +37,11 @@ id/name/description 各写各的；文件名现为 `dist/yiga_zh_hans.dusk`
 与 `dist/yiga_zh_hans_ique.dusk`。
 
 ```pwsh
+# 0) 准备开源字体（open 变体重渲染用；不入库，两套字库可分别替换）
+#    work/fonts/NotoSansCJKsc-Regular.otf   思源黑体 / Noto Sans CJK SC（OFL-1.1）
+#    work/fonts/LXGWWenKai-Regular.ttf      霞鹜文楷（OFL-1.1）
+#    配置里按字库分开指定：fonts.fontres.file / fonts.rubyres.file 与各自的 em / gamma
+
 # 1) 读 pak
 python scripts/extract_index.py <pak> work/index_new.bin          # 解密索引
 python scripts/list_index.py   work/index_new.bin Msgcn Fontcn    # 按目录/关键字找条目
@@ -51,9 +57,12 @@ python scripts/check_cn_coverage.py        # 文本码位 vs 字库覆盖核对
 python scripts/extract_name_keyboard.py    # 键盘字表 → data/name_keyboard.json（已随仓库提供，会自动跳过）
 python scripts/sjis_map.py                 # 码位映射 → work/sjis_map.json
 python scripts/patch_sjis_font.py          # 字库：一次产出开源字体（重渲染）与官方字库（只重排）两个变体
+                                           #   走 config 的 glyph_source；--glyph-source original 只出 ique（回归对照），
+                                           #   --glyph-source open:<ttf> 换字体文件，--em <px> 换字号
 python scripts/patch_sjis_text.py          # 消息重编码（含默认名的单字节码位）
 python scripts/diag_pack.py                # 验收，判据见「校验」
 python scripts/build_sjis_pack.py          # 打包：dist/<id>.dusk + dist/<id>_ique.dusk（不安装）
+python scripts/build_sjis_pack.py --check  # 只校验 mod.json 元数据、不写包（上传前先跑）
 python scripts/install.py                  # 安装：拷包 + 开关（--variant ique 装官方字库版，--list 只看现状）
 ```
 
@@ -69,9 +78,10 @@ python scripts/install.py                  # 安装：拷包 + 开关（--varian
    `.dusk` 是个 zip：`mod.json`（其 `id` 决定开关名）+ `overlay/<光盘内路径>`，加载时按光盘路径覆盖同名文件。
 3. 改 `<游戏目录>/data/config.json`：该包的 `mod.<id>.enabled` 与 `game.enableChineseNameKeyboard` 置 `true`、
    `game.language` 置 `2`，其它 CN 相关 mod 全置 `false`（它们覆盖的是同一批文件）。
-   `python scripts/install.py` 会自动完成第 2、3 步（`--variant ique` 装官方字库版），`game.language` 仍需自己设。
-4. 验证：标题提示、存档界面、对话、菜单、栏位文字应为简体中文，名字输入界面应显示中文默认名「林克 / 伊波娜」
-   （自己改名字只能用拉丁键盘：上游引擎没有中文键盘，那是 dusk-cn 分支的功能）；
+   `python scripts/install.py` 会自动完成第 2、3 步（`--variant ique` 装官方字库版）：拷包时**删掉另一个变体的包**
+   （两者覆盖同一批资源），并提示同作者的其他 mod 是否还开着。`game.language` 仍需自己设。
+4. 验证：标题提示、存档界面、对话、菜单、栏位文字应为简体中文，名字输入界面应显示中文默认名「林克 / 伊波娜」，
+   中文键盘（dusk-cn 分支的功能，需要 open 变体）可翻页选字；用上游 dusklight 时没有这个键盘，只能打拉丁字母；
    日志在 `%APPDATA%\TwilitRealm\Dusklight\logs\`。
 5. 旧存档里的名字存的是旧码位，会显示成错字：新建存档，或重新输入一次名字。
 
@@ -96,7 +106,7 @@ python scripts/install.py                  # 安装：拷包 + 开关（--varian
 两个内层名与 dusklight 的 `mDoExt_initFont0` / `mDoExt_initFont1` 硬编码要求一致。
 文本文件每行 `<消息序号>\t<DAT1 偏移>\t<文本>`，原文换行写作 `\n`（字面两字符），
 标签写成 `<Tggcccc>`（高字节 = group），其余控制码写成 `\xNN`。
-`res/Msgcn/bmgres99.arc` 内没有 BMG（109 字节的空壳），故无对应文本文件。
+`res/Msgcn/bmgres99.arc` 内没有 BMG（109 字节的空壳），对应的 `cn/text/bmgres99.txt` 是空文件（只有一个换行）。
 
 ### BMG（消息库）
 
@@ -113,9 +123,12 @@ python scripts/install.py                  # 安装：拷包 + 开关（--varian
 
 ### 引擎侧关键事实（已核对源码）
 
-**标签几何**：`001A`（2 字节 marker）+ 1 字节 size + 3 字节 tag id + 数据；**数据里步进 = `marker + size`、
-数据 = `size − 6`，而引擎 `on_tag_` 按 `marker + size + 1` / `size − 5` 算，所以转换时 size 要**减 1**。
-判据是 DAT1 消息边界（消息 2866 = `设置为` + 3 个 6 字节 tag + `00 00` = 26 字节，下一条偏移正好 2892）。
+**标签几何**：`001A`（2 字节 marker）+ 1 字节 size + 3 字节 tag id + 数据；**数据里**步进 = size 字节值**、
+数据 = `size − 6`（`patch_sjis_text.py` 的解析口径），引擎按 `size − 5` 取数据，所以转换时 size 要**减 1**。
+判据是 DAT1 消息边界（消息 2866 = `设置为` + 3 个 6 字节 tag + `00 00` = 26 字节，下一条偏移正好 2892）；
+用真实 pak 复测：`bmgres3.arc` 的 508 条消息按 `步进 = size` 有 507 条精确落在终止符（余 1 条是偏移共享的后缀，
+见「修法」第 6 条），按 `步进 = size + 2` 会有 22 条错位。
+注意 `export_cn_text.py`（导出 `cn/text/`）仍按 `步进 = size + 2`（`TAG_MARKER`）解析，与生产路径口径不同、尚未统一。
 早期文档里"size 比 EU 少 1、要 +1"的说法方向相反：那是用「码位在不在字库」当判据，被滑位产生的假码位骗了。
 
 **零字节即结束**：`parseCharacter_ShiftJIS` 遇首字节非前导（`00`）时只吃 1 字节并返回 `0`，
@@ -163,11 +176,22 @@ dusklight 有一批文本走逐字节字符串操作：`J2DTextBox::draw` 用 `v
 
 ## 名字与键盘
 
-- 默认名来自消息 `0x381`（`林克`）与 `0x382`（马，`伊波娜`）。
-- `game.enableChineseNameKeyboard = true` 后，字库侧给引擎硬编码的 `l_mojiZh[10][65]`（`src/d/d_name.cpp`，
-  Shift-JIS 码位，去掉翻页键后 550 格）逐格建 `MAP1` 别名：393 格用原字字形；55 格原字是日式新字体、本身没字形，
-  但对应简体字在库里，于是用简体（对照表 `NAME_VARIANT`，在 `patch_sjis_font.py`）；102 格连简体写法也没有，
-  于是指向空白字形（U+3000，格子显示为空、仍可按）。
+- 默认名来自消息 `0x381`（`林克`）与 `0x382`（马，`伊波娜`）。名字框逐字节取字符，所以这两个名字另外用
+  **0xA1 起的单字节码位**（`NAME_DEFAULT_CHARS` / `NAME_DEFAULT_BASE`）在字库里建同名别名；**两个变体都建**，
+  这样即使引擎只按 1 字节取字，默认名也能显示成中文。
+- 中文输入键盘的表（`l_mojiZh`，`src/d/d_name.cpp` 硬编码，Shift-JIS 码位，去掉翻页键后 550 格）由
+  `data/name_keyboard.json` 提供，`patch_sjis_font.py` 逐格建 `MAP1` 别名：
+  - 393 格原字在官中字库里有字形 → 直接用原字形；
+  - 55 格原字是日式写法、库里只有简体 → 换简体（对照表 `NAME_VARIANT`）；
+  - 102 格两种写法都没有 → **open 变体在图集尾部新增槽位、用开源字体把这 102 个字渲出来**；ique 变体没有新字形可渲，
+    只能指向空白字形（格子显示为空、仍可按）。
+- 上游 EU 键盘表 `l_mojiEisuPal_1/2` 里官中字库缺的 51 格（`PAL_KEY_CODES`，含 Œ/œ）同样处理：open 变体新增槽位渲字，
+  ique 变体不补。**所以「中文键盘整表可用」只对 open 变体成立。**
+- 键盘补全只进 open 变体（`patch_sjis_font.py` 里 `if not renderer: continue`，注释写明「那份表属于 open 变体」）；
+  open 变体的全部别名与统计落在 `work/keyboard_aliases.json`（`direct` / `variant` / `added` / `blanked` / `pal` / `name_default`），
+  数字以它为准。新增槽位会抬高 `GLY1.endCode`（上限 = `numRows × numColumns`），单页布局不变。
+- 这个中文键盘本身是 `snnh/dusk-cn` 分支的功能（`game.enableChineseNameKeyboard`）；上游 dusklight 没有该开关，
+  名字只能打拉丁字母，但默认名照样显示中文（靠上面的单字节别名）。
 - 键盘的按钮文案是消息 `0x38B/0x38C/0x388/0x38E`；旧编码下 `结束` 前的 tag 会把整串切断，导致按钮空白，现已修好。
 
 ## 校验
@@ -176,10 +200,29 @@ dusklight 有一批文本走逐字节字符串操作：`J2DTextBox::draw` 用 `v
   「未正常结束 0 条、缺字 0 次」与「名字键盘 … 不符 0」。
 - `cmp_msg.py` 逐字节对照包内文本与 pak 原文；`dump_bfn.py` 转储字库块头；
   `find_syms.py` 扫 exe 裸字符串（**dusklight.exe 没有带地址的符号表**，反查调用方要靠引擎源码）。
+- `font_render.py` 可单独跑标定/试印（不动游戏）：
+  `python scripts/font_render.py --font fontres --ttf work/fonts/NotoSansCJKsc-Regular.otf --em 46 --png work/fonts/render_fontres.png`；
+  与 `work/fonts/compare_*.png`、`orig_*.png` 对照挑 `em` / `gamma` / 字重。
+- `work/keyboard_aliases.json` 是 open 变体的键盘补全产物（别名对、新补槽字符与统计），排查键盘格时以它为准。
 - 引擎侧探针 `cn-mod/`：CMake 从 `https://github.com/snnh/dusk-cn.git` 拉源码编译出 `.dusk`，
   用 pre/post 钩子记录面板字节与字形码位（`J2DTextBox::draw`、`JUTResFont::drawChar_scale`、`J2DPrint::parse` 等），
   不替换任何函数，编译需 VS 2022 开发环境。旧版探针（含替换 `setString`/`initiate`）必须保持关闭，
   它按 2 字节扫串，与 Shift-JIS 数据同开会让文本错乱。
+
+## 发布到官方 mod 站
+
+`dist/<id>.dusk` 可以直接上传到 [twilitrealm.dev](https://twilitrealm.dev/mods/)（这份 mod 目录同时也是游戏内 Mod 浏览器的数据源）。
+
+- **上传前先跑 `python scripts/build_sjis_pack.py --check`**（只校验元数据、不写包）。闸门在 `build_sjis_pack.py` 的
+  `check_meta()`，阈值按站点实测取的保守值：`id` 小写字母/数字/下划线、单点分隔（同客户端 `utils::is_valid_mod_id`，
+  **发布后不可改**）；`name` ≤ 48 字符、`description` ≤ 200 字符且**必须单行**；`version` 形如 `X.Y.Z`；
+  `description` **不许带链接**（站点把它当 mod 页摘要，链接填站点的 Source 字段）。
+- `mod.json` 只写 `MOD_FIELDS` 白名单里的字段（`id/name/version/author/description/icon/banner`）——`config` 段里
+  多出来的键会被丢弃并在控制台提示，不会进包。
+- 站点侧还要手工填：分类（Utility / UI）、License、Source URL、截图、changelog；长文（安装说明、致谢、AI 声明）
+  放页面的描述正文里。
+- 两个变体各传各的（id 不同、互不覆盖）：`dist/yiga_zh_hans.dusk`（开源字体）与 `dist/yiga_zh_hans_ique.dusk`（官方字库）。
+- 发新版：改 `config` 里的 `version` 后重新打包上传；客户端按 `id` + `version` 校验，**id 不能变**（改了等于换一个 mod）。
 
 ## 许可与免责
 
@@ -187,4 +230,6 @@ dusklight 有一批文本走逐字节字符串操作：`J2DTextBox::draw` 用 `v
 - **不含游戏素材**：官方文本、字库、游戏数据及其派生成品包都不在仓库里；请自备正版
   《塞尔达传说：黄昏公主》（** ** **版）数据，用 `scripts/` 在本地导出。
   这些素材的版权归任天堂 / ** 等原权利人所有，不属于本仓库的许可范围。
+- **开源字体**：open 变体的字形由思源黑体 / Noto Sans CJK SC 与霞鹜文楷（均 OFL-1.1）渲染，字体文件不入库、
+  放 `work/fonts/` 自行获取；渲染出的位图随成品包分发，建议在站点页面注明所用字体与许可。
 - **无关联**：本项目与任天堂、** 及其关联公司无关，未获其授权或认可；仅供学习与研究，使用者自行承担风险。
