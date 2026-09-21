@@ -8,11 +8,11 @@ import paths
 # 文本部件（两个变体共用）写在 open 变体的目录里
 TEXT_PARTS = paths.parts_dir("open")
 
-# name/description 里 {region} / {language} / {repo} 的展开（写给玩家看的中文）
+# name/description 里 {region} / {language} / {repo} 的展开（写给玩家看）
 SLOT_NAMES = {
-    "region": {"us": "美", "eu": "欧", "jp": "日"},
-    "language": {"us": "英语", "uk": "英式英语", "de": "德语", "fr": "法语",
-                 "sp": "西班牙语", "it": "意大利语", "jp": "日语"},
+    "region": {"us": "United States", "eu": "Europe", "jp": "Japan"},
+    "language": {"us": "English (US)", "uk": "English (UK)", "de": "German", "fr": "French",
+                 "sp": "Spanish", "it": "Italian", "jp": "Japanese"},
 }
 
 

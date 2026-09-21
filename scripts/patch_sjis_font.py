@@ -110,7 +110,17 @@ def pal_keyboard_aliases(orig_glyph, pool):
                 new_chars[glyph] = char
             added += 1
         aliases.append((code, glyph))
-    print("   标准键盘补全: %d 格 (原本就有 %d / 新增渲染 %d)" % (len(aliases), kept, added))
+    # 引擎键盘里落在 ShiftJIS 前导字节区间（0x81–0x9F / 0xE0–0xFC）的格子，
+    # J2DPrint::parse 会把紧随的 ESC（第二次出现时是字符串结束符）并成假码位，
+    # 字母根本画不出来；ESC 被吞后 HM 还会被当普通字符画一遍（黑色，数据侧消不掉）。
+    # 这些假码位直接指向空白字形，让格子留空（共 26 格：大写页 Œ + 小写页 25 格）。
+    blank = orig_glyph.get(0x3000, 0)
+    base = len(aliases)
+    for code, glyph in list(aliases):
+        if 0x81 <= code <= 0x9F or 0xE0 <= code <= 0xFC:
+            aliases += [(code << 8 | 0x1B, blank), (code << 8, blank)]
+    print("   标准键盘补全: %d 格 (原本就有 %d / 新增渲染 %d / 前导字符合成别名 %d)"
+          % (base, kept, added, len(aliases) - base))
     return aliases, new_chars
 
 
