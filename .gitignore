@@ -4,6 +4,12 @@
 /cn/text/
 /cn/font/
 /cn/mods/
+/dist/
+
+.venv/
 *.log
 __pycache__/
 *.pyc
+
+*.code-workspace
+.vscode/
