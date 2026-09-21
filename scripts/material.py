@@ -1,7 +1,6 @@
 """cn/ 素材读取层。
 
-移植管线不接触游戏数据包：字体与消息的原始归档由使用者在本地导出到 cn/，
-文件内容与数据包里的条目相同（Yaz0 压缩的 RARC）。
+字库与消息归档由使用者自备，放在 cn/ 下（Yaz0 压缩的 RARC）。
 
   cn/font/fontres.arc.yaz0   cn/font/rubyres.arc.yaz0     字库（RARC 内是 BFN）
   cn/msg/bmgres.arc.yaz0 …   cn/msg/bmgres99.arc.yaz0     消息库（RARC 内是 BMG）

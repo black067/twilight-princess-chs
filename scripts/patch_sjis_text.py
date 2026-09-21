@@ -29,7 +29,7 @@ REFMARK_TAG = 0x060005
 REFMARK_CHAR = 0x203B
 
 # 默认名改写表（id → 文本）。实机标定：897 = 主角默认名、898 = 马匹默认名；
-# 899/900 是两屏标题，官中文本本来就对，不必改写。
+# 899/900 是两屏标题，文本本来就对，不必改写。
 # 表里的字写成 NAME_DEFAULT_CHARS 的单字节码位（码位表与理由在 patch_sjis_font.py）。
 NAME_MSG_OVERRIDES = {
     897: "林克",
@@ -191,4 +191,5 @@ def main():
               % (tail, nent, msgs, shrunk, exact, len(blob)))
 
 
-main()
+if __name__ == "__main__":
+    main()

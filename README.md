@@ -14,7 +14,7 @@
 | 路径 | 内容 |
 | --- | --- |
 | `scripts/` | 移植与打包管线（Python，只用标准库；外部路径见 `config.example.json`）。字库重渲染 `font_render.py` 走 Windows GDI+，**只支持 Windows** |
-| `data/` | 名字键盘字表 |
+| `data/` | 名字键盘字表、消息索引表（`msg_index.json`） |
 | `docs/` | 文档：技术备忘 / 管线复现 / 发布指南（见下方「文档」） |
 | `tools/` | 配套工具：`dusklight-download/` 拉 dusklight / dusk-cn 的 release、启盘镜像 |
 | `cn-mod/` | 引擎侧探针（只当仪器用，正式修复走数据侧） |
@@ -65,7 +65,7 @@ python scripts/install.py --region us      # --list 只看现状
 
 | 文档 | 内容 |
 | --- | --- |
-| [docs/技术备忘.md](docs/技术备忘.md) | 素材清单、BMG / BFN 格式、引擎侧关键事实、移植路线（根因 + 修法）、名字与键盘、校验与排障工具 |
+| [docs/技术备忘.md](docs/技术备忘.md) | 素材清单、容器格式、名字与键盘、校验与排障工具 |
 | [docs/管线复现.md](docs/管线复现.md) | 配置分层、完整命令与可调项、`install.py` 行为、常见坑 |
 | [docs/发布指南.md](docs/发布指南.md) | 上传官方 mod 站的字段规则与手工项 |
 
