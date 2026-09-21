@@ -72,7 +72,7 @@ python scripts/install.py --region us      # --list 只看现状
 | --- | --- |
 | [docs/技术备忘.md](docs/技术备忘.md) | 素材清单、容器格式、名字与键盘、校验与排障工具 |
 | [docs/管线复现.md](docs/管线复现.md) | 配置分层、完整命令与可调项、`install.py` 行为、常见坑 |
-| [docs/发布指南.md](docs/发布指南.md) | 上传官方 mod 站的字段规则与手工项 |
+| [docs/发布指南.md](docs/发布指南.md) | 上传 Dusklight mod 站的字段规则与手工项 |
 
 ## 许可与免责
 

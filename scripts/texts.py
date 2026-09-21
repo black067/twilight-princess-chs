@@ -28,7 +28,7 @@ import paths
 FILE = os.path.join(paths.CN, "texts.csv")
 COL_KEY = "key"
 COL_LOCALE = "zh-Hans"     # 译文列
-COL_SOURCE = "cn"          # 原文列（就地改写路线打包时对照它）
+COL_SOURCE = "cn"          # 原文列
 
 TAG_RE = re.compile(r"<T([0-9a-f]{6})(?::([0-9a-f]*))?>")
 

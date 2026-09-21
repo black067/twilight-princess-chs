@@ -1,8 +1,8 @@
 """对照校验：把变体自己那份部件按引擎口径解回字面串，与 cn/texts.csv 逐格比。
 
 跑哪个变体由 --variant 定（不给时 open）：open 的部件在 `work/sjis_parts`、比译文列 `zh-Hans`
-（码位表 `work/code_map.json`）；origin 的部件在 `work/sjis_parts.origin`、比官方原文列 `cn`
-（码位沿用官方字库的 Unicode 码位，搬过的查 `work/sjis_map.json` 的 remap）。
+（码位表 `work/code_map.json`）；origin 的部件在 `work/sjis_parts.origin`、比原文列 `cn`
+（码位沿用原版字库的 Unicode 码位，搬过的查 `work/sjis_map.json` 的 remap）。
 
 引擎路径：非前导字节吃 1 字节、前导字节（0x81–0x9F / 0xE0–0xFC）吃 2 字节、
 `0x1A` 后跟 1 字节长度是标签。打包时有两处有意改写，比较前统一：
