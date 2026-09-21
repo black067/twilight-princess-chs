@@ -28,13 +28,17 @@
         "name": "Chinese (Simplified) Translation",
         "version": "1.0.0",
         "author": "Yiga Clan",
-        "description": "A Chinese localization mod that replaces the {language} localization in the {region} version.\nThe text content is sourced from the Nvidia ** version (thanks to **).\nThe font set has been repacked using open-source fonts. (If you want to use the official font set, please clone the source code and repack it yourself.)\nIf you find any bugs, feel free to open an issue.\nBug reports, discussions, and forks are welcome."
+        "description": "A Chinese (Simplified) translation mod",
+        "icon": "assets/icon.png",
+        "banner": "assets/banner.png"
     },
     "mod_ique": {
         "id": "yiga.zh.hans.ique",
         "name": "Chinese (Simplified) Translation (**)",
         "version": "1.0.0",
         "author": "Yiga Clan",
-        "description": "A Chinese localization mod that replaces the {language} localization in the {region} version.\nThe text content is sourced from the Nvidia ** version (thanks to **).\nThis edition keeps the official **/** font bitmaps; only the archive structure is repacked.\nIf you find any bugs, feel free to open an issue.\nBug reports, discussions, and forks are welcome."
+        "description": "A Chinese (Simplified) translation mod",
+        "icon": "assets/icon.png",
+        "banner": "assets/banner.png"
     }
 }

@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import struct
 import sys
 import zipfile
 
@@ -16,13 +17,20 @@ SLOT_NAMES = {
                  "sp": "Spanish", "it": "Italian", "jp": "Japanese"},
 }
 
-# mod.json 只写这些字段（config 段里多出来的键只提示、不进包）
-MOD_FIELDS = ("id", "name", "version", "author", "description", "icon", "banner")
+# mod.json 的文本字段：顺序即包内键序（客户端 manifest.cpp 按名字取，顺序无要求，
+# 但固定成 id→name→version→author→description→icon→banner，方便与包内内容对拍）。
+TEXT_FIELDS = ("id", "name", "version", "author", "description")
 
-# 站点限制的本地闸门（保守值：站点已收录的 description 最长 265、全部单行、无链接）
+# icon / banner：config 里填**本地 PNG 路径**，包内固定放这两个路径（客户端找不到 manifest
+# 里的路径时会自动回退到 res/icon.png、res/banner.png；站点也从包里取图）。
+IMAGE_FIELDS = {"icon": "res/icon.png", "banner": "res/banner.png"}
+
+# 本地闸门：站点已收录 22 个 mod 的 summary（= mod.json 的 description）最长 265、全部单行无链接。
+# 只有长度当硬限制，换行/链接只提示。
 MAX_NAME = 48
-MAX_DESCRIPTION = 200
-MOD_ID_RE = re.compile(r"^[a-z0-9_]+(\.[a-z0-9_]+)+$")
+MAX_DESCRIPTION = 265
+# 客户端 utils::is_valid_mod_id：小写字母/数字/下划线/点，首尾不能是点、不能有连续点（单段也合法）
+MOD_ID_RE = re.compile(r"^[a-z0-9_.]+$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 URL_RE = re.compile(r"https?://|www\.", re.IGNORECASE)
 
@@ -38,16 +46,17 @@ def fill_slot(text, region, language):
 
 
 def select_fields(meta, variant):
-    """只保留 mod.json 认的字段，config 段里的内部键不进包。"""
-    extra = sorted(set(meta) - set(MOD_FIELDS))
+    """取要处理的字段；config 段里的内部键不进包（icon/banner 是本地路径，打包时换成包内路径）。"""
+    known = set(TEXT_FIELDS) | set(IMAGE_FIELDS)
+    extra = sorted(set(meta) - known)
     if extra:
         print("提示：%s 里的 %s 不进 mod.json" % (variant, ", ".join(extra)))
-    return {key: meta[key] for key in MOD_FIELDS if key in meta}
+    return {key: meta[key] for key in TEXT_FIELDS + tuple(IMAGE_FIELDS) if key in meta}
 
 
 def check_meta(meta):
-    """本地闸门：把站点会拒的问题挡在打包之前（站点只回一句笼统报错）。"""
-    problems = []
+    """本地闸门：站点会拒的问题挡在打包之前，其余只提示（站点只回一句笼统报错）。"""
+    problems, warnings = [], []
 
     def text(key):
         value = meta.get(key)
@@ -59,20 +68,27 @@ def check_meta(meta):
     mod_id, name, version = text("id"), text("name"), text("version")
     author, description = text("author"), text("description")
 
-    if mod_id and not MOD_ID_RE.match(mod_id):
-        problems.append("id：要小写字母/数字/下划线、单点分隔，现在 %r" % mod_id)
+    if mod_id and (not MOD_ID_RE.match(mod_id) or mod_id[0] == "." or mod_id[-1] == "."
+                   or ".." in mod_id):
+        problems.append("id：只能小写字母/数字/下划线/点，首尾不能是点、不能有连续点，现在 %r"
+                        % mod_id)
+    elif mod_id and "." not in mod_id:
+        warnings.append("id：不含点；站点示例都是反向域名（com.<作者>.<名字>）")
     if len(name) > MAX_NAME:
         problems.append("name：%d 字符 > %d" % (len(name), MAX_NAME))
     if version and not VERSION_RE.match(version):
         problems.append("version：要 X.Y.Z，现在 %r" % version)
     if len(description) > MAX_DESCRIPTION:
-        problems.append("description：%d 字符 > %d" % (len(description), MAX_DESCRIPTION))
+        problems.append("description：%d 字符 > %d（站点已收录最长的 summary）"
+                        % (len(description), MAX_DESCRIPTION))
     for key, value in (("name", name), ("author", author), ("description", description)):
         if "\n" in value or "\r" in value:
-            problems.append("%s：有换行；站点摘要只收单行" % key)
+            warnings.append("%s：含换行；站点只收录单行摘要，长文放页面正文" % key)
     if URL_RE.search(description):
-        problems.append("description：含链接；链接放站点的 Source 字段")
+        warnings.append("description：含链接；链接放站点的 Source 字段")
 
+    for line in warnings:
+        print("  提示：%s" % line, file=sys.stderr)
     if problems:
         for line in problems:
             print("  - %s" % line, file=sys.stderr)
@@ -87,6 +103,46 @@ def print_meta(meta):
     print("   author      %s" % meta.get("author"))
     print("   description %s  (%d)"
           % (meta.get("description"), len(str(meta.get("description", "")))))
+
+
+def png_size(path):
+    """PNG 的 (宽, 高)；不是 PNG 返回 None。"""
+    with open(path, "rb") as f:
+        head = f.read(24)
+    if head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        return None
+    return struct.unpack_from(">II", head, 16)
+
+
+def collect_images(meta):
+    """config 里的 icon/banner 源图 -> [(字段, 包内路径, 本地路径)]。
+
+    包内固定放 res/<字段>.png（客户端会在 manifest 路径不可用时回退到这两个路径，
+    站点也从包里取图）；没配就什么都不做，站点列表显示首字母占位。
+    """
+    out = []
+    for key, arcname in IMAGE_FIELDS.items():
+        value = meta.get(key)
+        if not value:
+            continue
+        src = str(value)
+        if not os.path.isabs(src):
+            src = os.path.join(paths.ROOT, src)
+        if not os.path.isfile(src):
+            sys.exit("%s 指定的图片不存在：%s" % (key, src))
+        size = png_size(src)
+        if size is None:
+            sys.exit("%s 只收 PNG：%s" % (key, src))
+        print("   %-8s %s  %dx%d" % (key, src, size[0], size[1]))
+        if key == "icon" and size[0] != size[1]:
+            print("  提示：icon 建议 1:1", file=sys.stderr)
+        if key == "banner" and size[0] < 800:
+            print("  提示：banner 建议宽 ≥ 800、约 3.5:1", file=sys.stderr)
+        out.append((key, arcname, src))
+    if not out:
+        print("  提示：没配 icon/banner，站点列表显示首字母占位"
+              "（在 config 的这段里填本地 PNG 路径）", file=sys.stderr)
+    return out
 
 
 def collect(dir_path, want_font):
@@ -110,6 +166,7 @@ def build(variant, meta, region, language, out_dir, check_only=False):
     print("== %s 变体 ==" % variant)
     print_meta(meta)
     check_meta(meta)
+    images = collect_images(meta)      # --check 也过一遍图片（存在性 + PNG 尺寸）
     if check_only:
         return None
 
@@ -121,14 +178,19 @@ def build(variant, meta, region, language, out_dir, check_only=False):
     assert files, "no parts found in %s" % TEXT_PARTS
     assert len(fonts) == 2, "%s 里应有 2 个字体部件，实际 %d" % (font_parts, len(fonts))
 
+    entries = [(arcname, src) for _, arcname, src in images] + files
+    for key, arcname, _ in images:
+        meta[key] = arcname             # manifest 里写包内路径
+
     out = os.path.join(out_dir, paths.escape_mod_id(meta["id"]) + ".dusk")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("mod.json", json.dumps(meta, indent=2, ensure_ascii=False) + "\n")
-        for arcname, path in files:
+        # 字节格式：2 空格缩进、键序 id→…→banner、末尾不留换行、UTF-8 无 BOM
+        z.writestr("mod.json", json.dumps(meta, indent=2, ensure_ascii=False))
+        for arcname, path in entries:
             z.write(path, arcname)
     print("built %s  %d bytes  id=%s  字库部件来自 %s"
           % (out, os.path.getsize(out), meta["id"], os.path.basename(font_parts)))
-    for arcname, _ in files:
+    for arcname, _ in entries:
         print("   %s" % arcname)
     return out
 
