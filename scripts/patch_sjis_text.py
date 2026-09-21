@@ -14,6 +14,7 @@ from build_cn_font import yaz0_encode
 from extract_entry import extract
 from extract_index import HEADER_LEN, decrypt_region
 from list_index import entries
+from patch_sjis_font import NAME_DEFAULT_BASE, NAME_DEFAULT_CHARS
 
 MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
 OUT_DIR = os.path.join(paths.WORK, "sjis_parts")
@@ -31,27 +32,9 @@ NEWLINE = 0x0A
 REFMARK_TAG = 0x060005
 REFMARK_CHAR = 0x203B
 
-# 默认名字的改写表（id → 文本）。
-#
-# 编号已由实机标定（给四个候选消息各写一个唯一标记，跑一次看落点）：
-#   897 槽 6 字节  = 主角默认名（第 1 屏名字框）
-#   898 槽 8 字节  = 马匹默认名（第 2 屏名字框）
-#   899 槽 14 字节 = 马匹界面标题（第 2 屏标题）
-#   900 槽 10 字节 = 主角界面标题（第 1 屏标题）
-# 即引擎用的编号跟官中文本自身的编号一致，899/900 的官中文本
-# （输入马匹名称 / 输入名称）本来就正确，不必改写。
-#
-# 默认名必须**每个字一个单字节**：EU 的 d_name_c::NameStrSet 每次只取 1 字节
-# （`mChrInfo[i].mCharacter = static_cast<u8>(*moji); moji++;`），而 setNameText()
-# 又把这个字节单独 `%c` 塞进 J2DTextBox；官中的「林克」是 2 字节码位，被拆成两个假字
-# 后，前导字节还会把紧随的 ESC(0x1B) 当成尾字节吞掉 → 名字框乱码（实机已确认）。
-# 0xA0..0xDF 在 ShiftJIS 里不是前导字节（JUTFont::isLeadByte_ShiftJIS 只看
-# 0x81..0x9F / 0xE0..0xFC），字体路径与消息路径都把它当完整码位 ⇒ 用
-# patch_sjis_font.py 里的 NAME_DEFAULT_CHARS 单字节别名（0xA1.. = 林 克 伊 波 娜），
-# 默认名就能是中文且到处都显示正确（名字框 / 对话 / 存档界面共用同一套字节）。
-# 只在 open 模式（字库带这些别名）下改写；original 模式保留官中原文做字节回归。
-NAME_DEFAULT_CHARS = "林克伊波娜"
-NAME_DEFAULT_BASE = 0x00A1
+# 默认名改写表（id → 文本）。实机标定：897 = 主角默认名、898 = 马匹默认名；
+# 899/900 是两屏标题，官中文本本来就对，不必改写。
+# 表里的字写成 NAME_DEFAULT_CHARS 的单字节码位（码位表与理由在 patch_sjis_font.py）。
 NAME_MSG_OVERRIDES = {
     897: "林克",
     898: "伊波娜",
@@ -190,13 +173,8 @@ def main():
     with open(MAP_JSON, encoding="utf-8") as f:
         doc = json.load(f)
     remap = {int(k, 16): int(v, 16) for k, v in doc["remap"].items()}
-    # 默认名的单字节别名只存在于 open 模式字库里（见 patch_sjis_font.py）。
-    source = paths.option("--glyph-source") or "original"
-    overrides = None
-    if source.startswith("open"):
-        overrides = {k: default_name_bytes(v) for k, v in NAME_MSG_OVERRIDES.items()}
-    else:
-        print("  glyph-source=original：不改默认名（保持官中原文）")
+    # 默认名的单字节别名两个变体都有（见 patch_sjis_font.py 的 name_default_aliases）
+    overrides = {k: default_name_bytes(v) for k, v in NAME_MSG_OVERRIDES.items()}
 
     pak = paths.pak()
     with open(pak, "rb") as f:

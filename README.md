@@ -13,23 +13,27 @@
 
 | 路径 | 内容 |
 | --- | --- |
-| `scripts/` | 提取与移植管线（22 个 Python 脚本，只用标准库；外部路径见 `config.example.json`） |
+| `scripts/` | 提取与移植管线（Python，只用标准库；外部路径见 `config.example.json`） |
 | `data/` | 入库的小数据：`name_keyboard.json` |
 | `docs/` | 逆向研究报告 |
 | `cn-mod/` | 引擎侧探针（只当仪器用，正式修复走数据侧） |
 | `cn/text/`、`cn/font/` | 官方素材，由脚本现产 |
-| `cn/mods/` | 打出来的 `.dusk` 成品包 |
-| `apk/`、`extracted/`、`work/` | 原始 APK、解包产物、中间数据 |
+| `dist/` | 打出来的 `.dusk` 成品包（开源字体版 / 官方字库版） |
+| `work/` | 中间数据：`sjis_parts*` 字库与文本部件、`fonts/` 开源字体、诊断脚本与缓存 |
 
 原始样本：新版 `The_Legend_of_Zelda_Twilight_Princess_**.**`，
 差分对照的旧版 `**.**`；哈希与尺寸见研究报告第 1 节。
 
 ## 复现
 
-外部路径统一写在 `scripts/config.json`（不入库，照同目录的 `config.example.json` 填一份即可），
-个别路径可用 `--pak` / `--pak-old` / `--game-dir` / `--exe` 临时覆盖。
-替换槽位同样在配置里：`region`（字库目录 `Font<region>`，us/eu/jp）与 `language`
-（消息目录 `Msg<language>`，uk/us/de/fr/sp/it/jp），默认 `eu`/`fr`（欧版法语槽）。
+配置分两层：`scripts/config.example.json` 是完整默认值（入库、机器无关，路径字段写成 `<占位符>`），
+`scripts/config.json` 只写本机差异（四个路径字段，不入库）；两者递归合并，命令行 `--xxx` 再覆盖。
+替换槽位、字体、mod 元信息都在 `config.example.json` 里：`region`（字库目录 `Font<region>`，us/eu/jp）与
+`language`（消息目录 `Msg<language>`，uk/us/de/fr/sp/it/jp）默认 `eu`/`fr`（欧版法语槽）；
+字体按字库分开配 `fonts.fontres` / `fonts.rubyres`（各 `file`/`em`/`gamma`）——游戏里本来就是两套字库。
+两个变体各有自己完整的一段元信息：`mod`（开源字体版）与 `mod_ique`（官方字库版，其 id 自带 `.ique`）——
+id/name/description 各写各的；文件名现为 `dist/yiga_zh_hans.dusk`
+与 `dist/yiga_zh_hans_ique.dusk`。
 
 ```pwsh
 # 1) 读 pak
@@ -43,13 +47,14 @@ python scripts/export_cn_archive.py        # 文本 + 字库
 python scripts/export_cn_text.py           # 标签感知的文本导出
 python scripts/check_cn_coverage.py        # 文本码位 vs 字库覆盖核对
 
-# 3) 移植管线，产出配置 out 目录下的 <mod id>.dusk（默认 dist/zh_hans.dusk）
+# 3) 移植管线，产出配置 out 目录下的两个成品包（dist/<id>.dusk 与 dist/<id>_ique.dusk）
 python scripts/extract_name_keyboard.py    # 键盘字表 → data/name_keyboard.json（已随仓库提供，会自动跳过）
 python scripts/sjis_map.py                 # 码位映射 → work/sjis_map.json
-python scripts/patch_sjis_font.py          # 字库单页重打包 + 映射 + 别名
-python scripts/patch_sjis_text.py          # 消息重编码
+python scripts/patch_sjis_font.py          # 字库：一次产出开源字体（重渲染）与官方字库（只重排）两个变体
+python scripts/patch_sjis_text.py          # 消息重编码（含默认名的单字节码位）
 python scripts/diag_pack.py                # 验收，判据见「校验」
-python scripts/build_sjis_pack.py          # 组装成品包
+python scripts/build_sjis_pack.py          # 打包：dist/<id>.dusk + dist/<id>_ique.dusk（不安装）
+python scripts/install.py                  # 安装：拷包 + 开关（--variant ique 装官方字库版，--list 只看现状）
 ```
 
 ## 环境与使用
@@ -59,12 +64,14 @@ python scripts/build_sjis_pack.py          # 组装成品包
 游戏镜像需自备正版：本项目在 GameCube 欧版上验证，`game.language = 2` 即它的法语槽；换 dump/槽位见「复现」里的 `region`/`language`。
 
 1. 取 dusk-cn 的 release 解压到游戏目录（便携模式下数据写在 `game/data/`）。
-2. 把构建出的成品包（默认 `dist/zh_hans.dusk`）放进 `<游戏目录>/data/mods/`。
+2. 把成品包放进 `<游戏目录>/data/mods/`：`dist/<id>.dusk`（开源字体版）或
+   `dist/<id>_ique.dusk`（官方字库版，只重排官方位图）。两者覆盖同一批资源，只能装一个。
    `.dusk` 是个 zip：`mod.json`（其 `id` 决定开关名）+ `overlay/<光盘内路径>`，加载时按光盘路径覆盖同名文件。
-3. 改 `<游戏目录>/data/config.json`：`mod.zh_hans.enabled` 与 `game.enableChineseNameKeyboard` 置 `true`、
+3. 改 `<游戏目录>/data/config.json`：该包的 `mod.<id>.enabled` 与 `game.enableChineseNameKeyboard` 置 `true`、
    `game.language` 置 `2`，其它 CN 相关 mod 全置 `false`（它们覆盖的是同一批文件）。
-   跑 `python scripts/build_sjis_pack.py` 会自动完成第 2、3 步，`game.language` 仍需自己设。
-4. 验证：标题提示、存档界面、对话、菜单、栏位文字应为简体中文，名字输入界面用翻页键切中文页；
+   `python scripts/install.py` 会自动完成第 2、3 步（`--variant ique` 装官方字库版），`game.language` 仍需自己设。
+4. 验证：标题提示、存档界面、对话、菜单、栏位文字应为简体中文，名字输入界面应显示中文默认名「林克 / 伊波娜」
+   （自己改名字只能用拉丁键盘：上游引擎没有中文键盘，那是 dusk-cn 分支的功能）；
    日志在 `%APPDATA%\TwilitRealm\Dusklight\logs\`。
 5. 旧存档里的名字存的是旧码位，会显示成错字：新建存档，或重新输入一次名字。
 

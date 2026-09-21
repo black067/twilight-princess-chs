@@ -1,18 +1,40 @@
 {
     "pak": "<**版 **_prd.pak 的路径（官中文本/字库在这个包里）>",
     "pak_old": "<旧版样本 **_prd.pak 的路径，仅差分对照用，可留空>",
-    "game_dir": "<dusklight 游戏目录，需要其中已有 data/config.json>",
+    "game_dir": "<dusklight 游戏目录，需要其中已有 data/config.json（只有 install.py 用）>",
     "dusklight_exe": "<dusklight.exe 的路径，仅扫符号用，可留空>",
-    "cn_font": "<开源字体文件（--glyph-source open 用），如 work/fonts/NotoSansCJKsc-Regular.otf，可留空>",
+
     "out": "dist",
     "region": "eu",
     "language": "fr",
+
+    "glyph_source": "open",
+    "fonts": {
+        "fontres": {
+            "file": "work/fonts/NotoSansCJKsc-Regular.otf",
+            "em": 46,
+            "gamma": 0.9
+        },
+        "rubyres": {
+            "file": "work/fonts/NotoSansCJKsc-Regular.otf",
+            "em": 46,
+            "gamma": 0.9
+        }
+    },
+
     "repo": "https://github.com/black067/twilight-princess-chs",
     "mod": {
-        "id": "zh.hans",
-        "name": "Localization - Chinese (Simplified)",
+        "id": "yiga.zh.hans",
+        "name": "Localization - Chinese (Simplified) via Yiga Clan",
         "version": "1.0.0",
         "author": "Yiga Clan",
         "description": "A Chinese localization mod that replaces the {language} localization in the {region} version.\nThe text content is sourced from the Nvidia ** version (thanks to **).\nThe font set has been repacked using open-source fonts. (If you want to use the official font set, please clone the source code and repack it yourself.)\nIf you find any bugs, feel free to open an issue.\nMod source code: {repo}\nBug reports, discussions, and forks are welcome."
+    },
+    "mod_ique": {
+        "id": "yiga.zh.hans.ique",
+        "name": "Localization - Chinese (Simplified) via Yiga Clan (Original Font)",
+        "version": "1.0.0",
+        "author": "Yiga Clan",
+        "description": "A Chinese localization mod that replaces the {language} localization in the {region} version.\nThe text content is sourced from the Nvidia ** version (thanks to **).\nThis edition keeps the official **/** font bitmaps; only the archive structure is repacked.\nIf you find any bugs, feel free to open an issue.\nMod source code: {repo}\nBug reports, discussions, and forks are welcome."
     }
 }

@@ -20,7 +20,6 @@ from list_index import entries
 MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
 NAME_KEYBOARD = os.path.join(paths.DATA, "name_keyboard.json")
 KB_JSON = os.path.join(paths.WORK, "keyboard_aliases.json")
-OUT_DIR = os.path.join(paths.WORK, "sjis_parts")
 
 FONT_SLOTS = {
     "res/Fontcn/fontres.arc": "res/%s/fontres.arc" % paths.font_dir(),
@@ -67,18 +66,9 @@ PAL_KEY_CODES = (
 )
 PAL_KEY_CHAR = {0x8C: "\u0152", 0x9C: "\u0153"}
 
-# 默认名字（主角/马）用的单字节码位：0xA1.. 依次对应下面这几个汉字。
-#
-# 背景：EU 版的名字输入路径（d_name_c::NameStrSet 的 PAL 分支）**每字符只取 1 字节**
-# （`mChrInfo[i].mCharacter = static_cast<u8>(*moji); moji++;`），而且名字框是把这个字节
-# 单独 `%c` 格式化进 J2DTextBox；官中的「林克」是 2 字节码位，被拆成两个假字后
-# 还会把后面的 ESC(0x1B) 当前导字节的尾字节吞掉 → 名字框乱码。
-#
-# 但 0xA0..0xDF 在 ShiftJIS 里不是前导字节（JUTFont::isLeadByte_ShiftJIS 只看
-# 0x81..0x9F / 0xE0..0xFC），所以字体路径（逐字节）与消息路径（parseCharacter_ShiftJIS）
-# 都会把它当成**完整的单字节码位**，两边的码值还一致。于是把这些码位指到字库里
-# 已有的汉字字形槽，就能不改引擎地让「林克 / 伊波娜」这种默认名正确显示。
-# 副作用：一个字 = 1 个字符位置，名字长度上限 8 ⇒ 最多 8 个汉字。
+# 默认名（主角/马）用的单字节码位：一个字 = 一个 0xA1.. 码位。
+# 名字框逐字节取字符，而 0xA0..0xDF 在 ShiftJIS 里不是前导字节，字体与消息两条
+# 路径都当成完整码位；机制与代价见 docs/研究报告.md §7.7。
 NAME_DEFAULT_CHARS = "林克伊波娜"
 NAME_DEFAULT_BASE = 0x00A1
 
@@ -166,11 +156,7 @@ def name_keyboard_aliases(orig_glyph, pool, open_mode=False):
 
 
 def name_default_aliases(orig_glyph):
-    """默认名字用的单字节码位（0xA1..）→ 字库里既有的字形槽。
-
-    不新增槽位、不重渲染：只把码位指到已有字形，所以对像素与压缩结果零影响。
-    返回 aliases = [(码位, 槽位)]。
-    """
+    """0xA1.. → NAME_DEFAULT_CHARS 各字在字库里的既有字形槽（不新增槽、不重渲染）。"""
     aliases = []
     for i, char in enumerate(NAME_DEFAULT_CHARS):
         glyph = orig_glyph.get(ord(char))
@@ -212,20 +198,31 @@ def add_aliases(body, blocks, orig_glyph, remap, kb_aliases):
     return bytes(out)
 
 
+def font_settings(name, cli_ttf, cli_em):
+    """每套字库的 (ttf, em, gamma)：config 的 fonts.<name> 为准（fontres 正文 / rubyres 小字）。"""
+    cfg = paths.config_value("fonts")
+    cfg = cfg.get(name) if isinstance(cfg, dict) else None
+    cfg = cfg if isinstance(cfg, dict) else {}
+    ttf = cli_ttf or cfg.get("file")
+    em = float(cli_em or cfg.get("em") or font.DEFAULT_EM)
+    gamma = float(cfg.get("gamma") or font.DEFAULT_GAMMA)
+    return ttf, em, gamma
+
+
 def main():
     with open(MAP_JSON, encoding="utf-8") as f:
         doc = json.load(f)
     remap = {int(k, 16): int(v, 16) for k, v in doc["remap"].items()}
 
     source = paths.option("--glyph-source") or "original"
-    ttf = None
+    cli_ttf = None
     if source != "original":
         if not source.startswith("open"):
             sys.exit("--glyph-source 只支持 original 或 open[:<ttf>]：%s" % source)
-        ttf = source.split(":", 1)[1] if ":" in source else paths.option("--cn-font")
-        if not ttf or not os.path.exists(ttf):
-            sys.exit("open 模式需要字体文件：--glyph-source open:<ttf>，或在 config.json 配 cn_font")
-    em = float(paths.option("--em") or font.DEFAULT_EM)
+        cli_ttf = source.split(":", 1)[1] if ":" in source else None
+    cli_em = paths.option("--em")
+    # original 只产出 ique 变体（字节回归/预览用）；否则一次产出两个
+    wanted = ("ique",) if source == "original" else tuple(v for v, _ in paths.VARIANTS)
 
     pak = paths.pak()
     with open(pak, "rb") as f:
@@ -234,14 +231,46 @@ def main():
         index = decrypt_region(f, HEADER_LEN, size1, "header")
     recs = entries(index)
     data_start = HEADER_LEN + len(index)
-    os.makedirs(OUT_DIR, exist_ok=True)
+    # pak 只读一次：两套字库的 arc 取出来缓存，两个变体共用
+    material = {}
+    for src in FONT_SLOTS:
+        r = next(x for x in recs if x[0] == src)
+        material[src] = yaz0.decompress(extract(pak, data_start, src, r[1], r[3]))
 
-    renderer = font.Renderer(ttf) if ttf else None
     kb_tables = {}
+    for variant, _ in paths.VARIANTS:
+        if variant not in wanted:
+            continue
+        out_dir = paths.parts_dir(variant)
+        print("### 变体 %s -> %s" % (variant, out_dir))
+        os.makedirs(out_dir, exist_ok=True)
+        build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables)
+
+    if kb_tables:
+        with open(KB_JSON, "w", encoding="utf-8") as f:
+            json.dump(kb_tables, f, ensure_ascii=False, indent=1)
+        print("wrote %s" % KB_JSON)
+    else:
+        print("跳过 %s（本次没跑 open 变体）" % KB_JSON)
+
+
+def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
+    """组装一个变体的两套字库：open 重渲染字形并补键盘格，ique 只重排官中位图 + 别名。"""
+    renderers = {}
     try:
         for src, dst in FONT_SLOTS.items():
-            r = next(x for x in recs if x[0] == src)
-            arc = yaz0.decompress(extract(pak, data_start, src, r[1], r[3]))
+            arc = material[src]
+            name = os.path.splitext(os.path.basename(dst))[0]
+            renderer = None
+            em = gamma = 0.0
+            if variant == "open":
+                ttf, em, gamma = font_settings(name, cli_ttf, cli_em)
+                if not ttf or not os.path.exists(ttf):
+                    sys.exit("open 需要字体文件：config.json 的 fonts.%s.file，或 "
+                             "--glyph-source open:<ttf>" % name)
+                if ttf not in renderers:
+                    renderers[ttf] = font.Renderer(ttf)
+                renderer = renderers[ttf]
             start, bfn, blocks = R.parse_bfn(arc)
             bfn_size = struct.unpack_from(">I", bfn, 0x08)[0]
             print("== %s bfn@%#x size=%d" % (src, start, bfn_size))
@@ -282,7 +311,8 @@ def main():
             pal_aliases, pal_chars = ((), {}) if not renderer else \
                 pal_keyboard_aliases(orig_glyph, pool)
             new_chars.update(pal_chars)
-            name_aliases = name_default_aliases(orig_glyph) if renderer else ()
+            # 默认名单字节别名两个变体都要（ique 直接指向官中原字形，无需重渲染）
+            name_aliases = name_default_aliases(orig_glyph)
 
             if renderer and new_chars:
                 end_code = None
@@ -301,7 +331,7 @@ def main():
                 bboxes, _ = font.scan_bboxes(bytes(arc2), sorted(roster))
                 inf1 = font.read_inf1(bytes(arc2))
                 atlas, rstats = font.render_atlas(
-                    renderer, roster, fields, em=em, bboxes=bboxes,
+                    renderer, roster, fields, em=em, gamma=gamma, bboxes=bboxes,
                     baseline=inf1["ascent"] if inf1 else font.DEFAULT_BASELINE)
                 print("   渲染 %d 字（继承 %d / 基线 %d / 缩放充入 %d / 裁剪 %d / 空 %d）endCode=%s"
                       % (rstats["rendered"], rstats["inherit"], rstats["fallback"],
@@ -313,11 +343,13 @@ def main():
             new_bfn = add_aliases(bytes(arc2), blocks, orig_glyph, remap,
                                   list(kb_aliases) + list(pal_aliases) + list(name_aliases))
             new_arc = patch_rarc(arc, start, new_bfn)
-            path = os.path.join(OUT_DIR, dst.replace("/", "_"))
+            path = os.path.join(out_dir, dst.replace("/", "_"))
             with open(path, "wb") as f:
                 f.write(yaz0_encode(new_arc))
             print("   wrote %s (arc %d -> %d bytes, yaz0 %d bytes)"
                   % (os.path.basename(path), len(arc), len(new_arc), os.path.getsize(path)))
+            if not renderer:
+                continue    # ique 变体不做键盘补全，那份表属于 open 变体
             kb_tables[os.path.splitext(os.path.basename(dst))[0]] = {
                 "aliases": [["%04X" % c, "%04X" % i] for c, i in kb_aliases],
                 "new_chars": {"%04X" % i: ch for i, ch in sorted(new_chars.items())},
@@ -333,12 +365,8 @@ def main():
                 },
             }
     finally:
-        if renderer:
+        for renderer in renderers.values():
             renderer.close()
-
-    with open(KB_JSON, "w", encoding="utf-8") as f:
-        json.dump(kb_tables, f, ensure_ascii=False, indent=1)
-    print("wrote %s" % KB_JSON)
 
 
 if __name__ == "__main__":

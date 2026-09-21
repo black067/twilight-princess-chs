@@ -1,8 +1,7 @@
-"""外部路径统一入口。
+"""外部路径与默认配置的统一入口。
 
-机器相关路径（pak、游戏目录、dusklight.exe）统一写在同目录的 config.json 里，
-命令行参数可逐个覆盖；脚本本身只认仓库内相对路径。
-config.json 的模板见 config.example.json
+config.example.json 是完整默认值（入库，路径字段写 <占位符>）；config.json 只写本机差异；
+--xxx 命令行再覆盖。两者递归合并。
 """
 
 import json
@@ -15,6 +14,17 @@ WORK = os.path.join(ROOT, "work")
 DATA = os.path.join(ROOT, "data")
 CN = os.path.join(ROOT, "cn")
 CONFIG = os.path.join(HERE, "config.json")
+CONFIG_EXAMPLE = os.path.join(HERE, "config.example.json")
+
+# 两个成品变体：(变体名, config 里的元信息段)。字库部件目录也在 work 下由这里定，
+# 字库/打包/安装脚本共用，避免各写一份。
+VARIANTS = (("open", "mod"), ("ique", "mod_ique"))
+PARTS_DIR = {"open": "sjis_parts", "ique": "sjis_parts.ique"}
+
+
+def parts_dir(variant):
+    """变体的字库部件目录（work/ 下）。"""
+    return os.path.join(WORK, PARTS_DIR[variant])
 
 # 命令行参数 -> 配置字段
 KEYS = {
@@ -44,16 +54,46 @@ def _option(name):
     return None
 
 
+def _load(path):
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            doc = json.load(f)
+    except (OSError, ValueError) as exc:
+        sys.exit("读取 %s 失败：%s" % (path, exc))
+    return doc if isinstance(doc, dict) else {}
+
+
+def _overlay(base, over):
+    """递归覆盖：两边都是 dict 的逐键合并，其余整体覆盖。"""
+    out = dict(base)
+    for key, value in over.items():
+        if isinstance(out.get(key), dict) and isinstance(value, dict):
+            out[key] = _overlay(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def _drop_placeholders(doc):
+    """<说明> 占位符当成没配。"""
+    out = {}
+    for key, value in doc.items():
+        if isinstance(value, dict):
+            out[key] = _drop_placeholders(value)
+        elif isinstance(value, str) and value.startswith("<") and value.endswith(">"):
+            continue
+        else:
+            out[key] = value
+    return out
+
+
 def _config():
     global _cache
     if _cache is None:
-        _cache = {}
-        if os.path.exists(CONFIG):
-            try:
-                with open(CONFIG, encoding="utf-8") as f:
-                    _cache = json.load(f)
-            except (OSError, ValueError) as exc:
-                sys.exit("读取 %s 失败：%s" % (CONFIG, exc))
+        _cache = _overlay(_drop_placeholders(_load(CONFIG_EXAMPLE)),
+                          _drop_placeholders(_load(CONFIG)))
     return _cache
 
 
