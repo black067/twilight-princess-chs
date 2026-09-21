@@ -10,27 +10,19 @@ sys.path.insert(0, SCRIPTS)
 
 import bfn_repack as R
 import font_render as font
+import material
 import paths
 import yaz0
-from build_cn_font import patch_rarc, repack_bfn, yaz0_encode
-from extract_entry import extract
-from extract_index import HEADER_LEN, decrypt_region
-from list_index import entries
+from gly1_single_page import patch_rarc, repack_bfn
 
 MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
 NAME_KEYBOARD = os.path.join(paths.DATA, "name_keyboard.json")
 KB_JSON = os.path.join(paths.WORK, "keyboard_aliases.json")
 
-# pak 里的官中字库 -> 部件文件名（部件不带槽位：打包时按地区写进 Font<region>）
-FONT_SLOTS = {
-    "res/Fontcn/fontres.arc": "fontres.arc",
-    "res/Fontcn/rubyres.arc": "rubyres.arc",
-}
-
 SHIFT_JIS_FONT_TYPE = 2
 
 # 引擎在非日版下会为 group-6 图标 tag 插入 1 字节码位（d_msg_class.cpp 的 CHAR_CODE_*）。
-# 这些码位在原字库里对应图标字形；本字库（** CN）没有它们，改成指向等价的符号字形。
+# 这些码位在原字库里对应图标字形；本字库没有它们，改成指向等价的符号字形。
 ICON_ALIAS = {
     0x00B1: 0x2605,  # STAR_ICON          -> ★
     0x00B2: 0x2642,  # MALE_ICON          -> ♂
@@ -41,7 +33,7 @@ ICON_ALIAS = {
     0x00BE: 0x2193,  # THIN_DOWN_ARROW    -> ↓
 }
 
-# 名字键盘（l_mojiZh）原表里 157 格是** CN 字库没收的日式写法/生僻字。
+# 名字键盘（l_mojiZh）原表里 157 格是原字库没收的日式写法/生僻字。
 # 下面这 55 格是日式新字体，对应的简体字在字库里，用简体替代；其余 102 格没有字形，
 # 指向空白字形，免得引擎去查一个不存在的码位。
 NAME_VARIANT = {
@@ -58,7 +50,7 @@ NAME_VARIANT = {
 
 # 引擎自带名字键盘（上游 d_name.cpp 的 l_mojiEisuPal_1/2，EU 版）里，字库没有的格子。
 # 码位就是表里的码位：0xC0..0xDF/0xE0..0xFF 与 Latin-1 对齐，0x8C/0x9C 是表里用的
-# SJIS 兼容码位，分别对应 Œ/œ。官中字库也没有这些码位，所以这 51 格在实机上是空的。
+# SJIS 兼容码位，分别对应 Œ/œ。原字库也没有这些码位，所以这 51 格在实机上是空的。
 PAL_KEY_CODES = (
     0xC0, 0xC1, 0xC2, 0xC4, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE,
     0xCF, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD6, 0x8C, 0xD9, 0xDA, 0xDB, 0xDC,
@@ -69,7 +61,7 @@ PAL_KEY_CHAR = {0x8C: "\u0152", 0x9C: "\u0153"}
 
 # 默认名（主角/马）用的单字节码位：一个字 = 一个 0xA1.. 码位。
 # 名字框逐字节取字符，而 0xA0..0xDF 在 ShiftJIS 里不是前导字节，字体与消息两条
-# 路径都当成完整码位；机制与代价见 docs/研究报告.md §7.7。
+# 路径都当成完整码位；机制与代价见 docs/技术备忘.md 的「名字与键盘」。
 NAME_DEFAULT_CHARS = "林克伊波娜"
 NAME_DEFAULT_BASE = 0x00A1
 
@@ -235,18 +227,8 @@ def main():
     # original 只产出 ique 变体（字节回归/预览用）；否则一次产出两个
     wanted = ("ique",) if source == "original" else tuple(v for v, _ in paths.VARIANTS)
 
-    pak = paths.pak()
-    with open(pak, "rb") as f:
-        head = f.read(HEADER_LEN)
-        size1 = struct.unpack_from("<I", head, 0x18)[0]
-        index = decrypt_region(f, HEADER_LEN, size1, "header")
-    recs = entries(index)
-    data_start = HEADER_LEN + len(index)
-    # pak 只读一次：两套字库的 arc 取出来缓存，两个变体共用
-    material = {}
-    for src in FONT_SLOTS:
-        r = next(x for x in recs if x[0] == src)
-        material[src] = yaz0.decompress(extract(pak, data_start, src, r[1], r[3]))
+    # 两套字库的 arc 只读一次，两个变体共用
+    arcs = material.font_arcs()
 
     kb_tables = {}
     for variant, _ in paths.VARIANTS:
@@ -255,7 +237,7 @@ def main():
         out_dir = paths.parts_dir(variant)
         print("### 变体 %s -> %s" % (variant, out_dir))
         os.makedirs(out_dir, exist_ok=True)
-        build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables)
+        build_font(arcs, remap, variant, out_dir, cli_ttf, cli_em, kb_tables)
 
     if kb_tables:
         with open(KB_JSON, "w", encoding="utf-8") as f:
@@ -266,11 +248,11 @@ def main():
 
 
 def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
-    """组装一个变体的两套字库：open 重渲染字形并补键盘格，ique 只重排官中位图 + 别名。"""
+    """组装一个变体的两套字库：open 重渲染字形并补键盘格，ique 只重排原始位图 + 别名。"""
     renderers = {}
     try:
-        for src, dst in FONT_SLOTS.items():
-            arc = material[src]
+        for dst in paths.FONT_PART_NAMES:
+            arc = material[dst]
             name = os.path.splitext(os.path.basename(dst))[0]
             renderer = None
             em = gamma = 0.0
@@ -284,7 +266,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
                 renderer = renderers[ttf]
             start, bfn, blocks = R.parse_bfn(arc)
             bfn_size = struct.unpack_from(">I", bfn, 0x08)[0]
-            print("== %s bfn@%#x size=%d" % (src, start, bfn_size))
+            print("== %s bfn@%#x size=%d" % (dst, start, bfn_size))
 
             packed = repack_bfn(bfn[:bfn_size])
             _, _, blocks = R.parse_bfn(packed)
@@ -322,7 +304,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
             pal_aliases, pal_chars = ((), {}) if not renderer else \
                 pal_keyboard_aliases(orig_glyph, pool)
             new_chars.update(pal_chars)
-            # 默认名单字节别名两个变体都要（ique 直接指向官中原字形，无需重渲染）
+            # 默认名单字节别名两个变体都要（ique 直接指向原始字形，无需重渲染）
             name_aliases = name_default_aliases(orig_glyph)
 
             if renderer and new_chars:
@@ -356,7 +338,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
             new_arc = patch_rarc(arc, start, new_bfn)
             path = os.path.join(out_dir, dst)
             with open(path, "wb") as f:
-                f.write(yaz0_encode(new_arc))
+                f.write(yaz0.encode(new_arc))
             print("   wrote %s (arc %d -> %d bytes, yaz0 %d bytes)"
                   % (os.path.basename(path), len(arc), len(new_arc), os.path.getsize(path)))
             if not renderer:

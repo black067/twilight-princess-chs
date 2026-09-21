@@ -566,7 +566,7 @@ def _arg(name, default=None):
 
 def _repacked(arc):
     """把 RARC 里的多页 BFN 重打包成单页（与主管线同款），返回 (packed, fields)。"""
-    from build_cn_font import repack_bfn
+    from gly1_single_page import repack_bfn
     start, bfn, _ = R.parse_bfn(arc)
     size = struct.unpack_from(">I", bfn, 0x08)[0]
     packed = repack_bfn(bfn[:size])
@@ -592,7 +592,7 @@ def main():
         sys.exit("需要 --ttf <字体文件>（或 config.json 的 cn_font 字段）")
     arc_path = os.path.join(ROOT, "cn", "font", "%s.arc.yaz0" % font_name)
     if not os.path.exists(arc_path):
-        sys.exit("缺少 %s：先跑 scripts/export_cn_archive.py 导出官方素材" % arc_path)
+        sys.exit("缺少 %s：把字库归档导出到 cn/font/（见 docs/管线复现.md）" % arc_path)
 
     t0 = time.time()
     with open(arc_path, "rb") as f:

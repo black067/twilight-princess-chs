@@ -1,6 +1,4 @@
 {
-    "pak": "<**版 **_prd.pak 的路径（官中文本/字库在这个包里）>",
-    "pak_old": "<旧版样本 **_prd.pak 的路径，仅差分对照用，可留空>",
     "dusklight_exe": "<dusklight.exe 的路径，仅扫符号用，可留空>",
 
     "out": "dist",
@@ -39,7 +37,7 @@
     },
     "mod_ique": {
         "id": "yiga.zh.hans.ique.{region}",
-        "name": "Chinese (Simplified) Translation (**)",
+        "name": "Chinese (Simplified) Translation (bitmap font)",
         "version": "1.0.0",
         "author": "Yiga Clan",
         "description": "A Chinese (Simplified) translation mod",

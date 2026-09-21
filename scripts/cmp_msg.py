@@ -9,11 +9,9 @@ SCRIPTS = os.path.join(os.path.dirname(HERE), "scripts")
 sys.path.insert(0, SCRIPTS)
 
 import bmg
+import material
 import paths
 import yaz0
-from extract_entry import extract
-from extract_index import HEADER_LEN, decrypt_region
-from list_index import entries
 
 
 def bmg_entries(blob, off):
@@ -70,7 +68,7 @@ def main():
     ap.add_argument("--dusk", help="成品包，默认取 config 的 out/<id>.dusk")
     ap.add_argument("--entry", help="包内条目，默认 overlay/res/<消息目录>/bmgres.arc")
     ap.add_argument("--ids", default="99,100,101,102,175")
-    ap.add_argument("--pak-entry", default="res/Msgcn/bmgres.arc")
+    ap.add_argument("--cn-entry", default="bmgres.arc", help="cn/msg/ 下的部件名，对照用")
     args = ap.parse_args()
     ids = [int(x) for x in args.ids.split(",")]
     region, language = paths.pick_disc(args.disc, "--disc")
@@ -86,17 +84,9 @@ def main():
     print("  yaz0ed=%d bytes, MESG@%#x" % (len(blob), off))
     show("PACK " + entry, blob, off, ids)
 
-    pak = paths.pak()
-    with open(pak, "rb") as f:
-        head = f.read(HEADER_LEN)
-        size1 = struct.unpack_from("<I", head, 0x18)[0]
-        index = decrypt_region(f, HEADER_LEN, size1, "header")
-    recs = entries(index)
-    data_start = HEADER_LEN + len(index)
-    r = next(x for x in recs if x[0] == args.pak_entry)
-    arc = yaz0.decompress(extract(pak, data_start, args.pak_entry, r[1], r[3]))
+    arc = dict(material.msg_arcs())[args.cn_entry]
     off2 = arc.find(b"MESG")
-    show("PAK " + args.pak_entry, arc, off2, ids)
+    show("CN " + args.cn_entry, arc, off2, ids)
 
 
 main()

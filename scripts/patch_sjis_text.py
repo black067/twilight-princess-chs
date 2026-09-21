@@ -10,10 +10,7 @@ sys.path.insert(0, SCRIPTS)
 
 import paths
 import yaz0
-from build_cn_font import yaz0_encode
-from extract_entry import extract
-from extract_index import HEADER_LEN, decrypt_region
-from list_index import entries
+import material
 from patch_sjis_font import NAME_DEFAULT_BASE, NAME_DEFAULT_CHARS
 
 MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
@@ -175,29 +172,21 @@ def main():
     # 默认名的单字节别名两个变体都有（见 patch_sjis_font.py 的 name_default_aliases）
     overrides = {k: default_name_bytes(v) for k, v in NAME_MSG_OVERRIDES.items()}
 
-    pak = paths.pak()
-    with open(pak, "rb") as f:
-        head = f.read(HEADER_LEN)
-        size1 = struct.unpack_from("<I", head, 0x18)[0]
-        index = decrypt_region(f, HEADER_LEN, size1, "header")
-    recs = entries(index)
-    data_start = HEADER_LEN + len(index)
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    for name in [x[0] for x in recs if x[0].startswith("res/Msgcn/")]:
-        r = next(x for x in recs if x[0] == name)
-        blob = bytearray(yaz0.decompress(extract(pak, data_start, name, r[1], r[3])))
-        tail = name.split("/")[-1]
+    for base, arc in material.msg_arcs():
+        blob = bytearray(arc)
+        tail = base
         path = os.path.join(OUT_DIR, tail)
         if blob.find(b"MESG") < 0:
             with open(path, "wb") as f:
-                f.write(yaz0_encode(bytes(blob)))
+                f.write(yaz0.encode(bytes(blob)))
             print("  %-14s copied as-is" % tail)
             continue
         nent, msgs, shrunk, exact = patch_mesg(
             blob, remap, overrides if tail == "bmgres.arc" else None)
         with open(path, "wb") as f:
-            f.write(yaz0_encode(bytes(blob)))
+            f.write(yaz0.encode(bytes(blob)))
         print("  %-14s entries=%-5d msgs=%-5d shrunk=%-5d exact=%-5d size %d"
               % (tail, nent, msgs, shrunk, exact, len(blob)))
 

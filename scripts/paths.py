@@ -19,6 +19,8 @@ CONFIG_EXAMPLE = os.path.join(HERE, "config.example.json")
 # 两个成品变体：(变体名, config 里的元信息段)。字库部件目录也在 work 下由这里定，
 # 字库/打包/安装脚本共用，避免各写一份。
 VARIANTS = (("open", "mod"), ("ique", "mod_ique"))
+# 对外发布的变体；另一个变体（保留原字库位图）只在本机用 --variant 打
+PUBLISHED_VARIANTS = ("open",)
 PARTS_DIR = {"open": "sjis_parts", "ique": "sjis_parts.ique"}
 # 字库部件文件名：不带槽位，同一个部件要写进各地区的 Font<region> 目录
 FONT_PART_NAMES = ("fontres.arc", "rubyres.arc")
@@ -43,8 +45,6 @@ def text_parts():
 
 # 命令行参数 -> 配置字段
 KEYS = {
-    "--pak": "pak",
-    "--pak-old": "pak_old",
     "--exe": "dusklight_exe",
     "--cn-font": "cn_font",
     "--glyph-source": "glyph_source",
@@ -148,14 +148,6 @@ def _need(name, what):
     if not value:
         sys.exit("%s：在 %s 里填 \"%s\"，或用 %s <路径> 指定" % (what, CONFIG, KEYS.get(name, name.lstrip("-")), name))
     return value
-
-
-def pak():
-    return _need("--pak", "需要** pak 路径")
-
-
-def pak_old():
-    return _need("--pak-old", "需要旧版样本 pak 路径")
 
 
 def mods_dir():

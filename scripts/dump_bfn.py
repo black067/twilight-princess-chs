@@ -8,11 +8,7 @@ SCRIPTS = os.path.join(ROOT, "scripts")
 sys.path.insert(0, SCRIPTS)
 
 import bfn_repack as R
-import paths
-import yaz0
-from extract_entry import extract
-from extract_index import HEADER_LEN, decrypt_region
-from list_index import entries
+import material
 
 
 def hexline(d, off, n):
@@ -20,17 +16,9 @@ def hexline(d, off, n):
 
 
 def main():
-    pak = paths.pak()
-    with open(pak, "rb") as f:
-        head = f.read(HEADER_LEN)
-        size1 = struct.unpack_from("<I", head, 0x18)[0]
-        index = decrypt_region(f, HEADER_LEN, size1, "header")
-    recs = entries(index)
-    data_start = HEADER_LEN + len(index)
-
-    for name in ("res/Fontcn/fontres.arc", "res/Fontcn/rubyres.arc"):
-        r = next(x for x in recs if x[0] == name)
-        arc = yaz0.decompress(extract(pak, data_start, name, r[1], r[3]))
+    arcs = material.font_arcs()
+    for name in ("fontres.arc", "rubyres.arc"):
+        arc = arcs[name]
         start, bfn, blocks = R.parse_bfn(arc)
         print("== %s  arc=%d  bfn@%#x size=%d" % (name, len(arc), start, len(bfn)))
         print("   header: %s" % hexline(bfn, 0, 0x20))

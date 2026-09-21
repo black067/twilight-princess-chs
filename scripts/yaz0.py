@@ -1,3 +1,11 @@
+"""Yaz0 编解码。
+
+`decompress` 支持完整格式（含回引）；`encode` 只写字面量，够用且实现最短。
+"""
+
+import struct
+
+
 def decompress(src):
     if src[:4] != b"Yaz0":
         raise ValueError("not Yaz0")
@@ -36,3 +44,24 @@ def decompress(src):
             for k in range(count):
                 out.append(out[start + k])
     return bytes(out[:out_size])
+
+
+def encode(data):
+    """只写字面量的 Yaz0 编码：8 字节一组、每组的 code 位全 1。
+
+    不做回引，压出来的文件比标准编码器大，但实现只有几行且必然可被 decompress 还原。
+    """
+    out = bytearray(b"Yaz0")
+    out += struct.pack(">I", len(data))
+    out += b"\x00" * 8
+    p = 0
+    while p < len(data):
+        n = min(8, len(data) - p)
+        code = 0
+        for i in range(8):
+            if i < n:
+                code |= 1 << (7 - i)
+        out.append(code)
+        out += data[p : p + n]
+        p += n
+    return bytes(out)

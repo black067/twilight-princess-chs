@@ -9,11 +9,8 @@ SCRIPTS = os.path.join(ROOT, "scripts")
 sys.path.insert(0, SCRIPTS)
 
 import bfn_repack as R
+import material
 import paths
-import yaz0
-from extract_entry import extract
-from extract_index import HEADER_LEN, decrypt_region
-from list_index import entries
 
 OUT = os.path.join(paths.WORK, "sjis_map.json")
 NAME_KEYBOARD = os.path.join(paths.DATA, "name_keyboard.json")
@@ -36,11 +33,6 @@ def safe_codes():
     for lead in leads:
         for trail in trails:
             yield (lead << 8) | trail
-
-
-def load_bmg(pak, data_start, recs, name):
-    r = next(x for x in recs if x[0] == name)
-    return yaz0.decompress(extract(pak, data_start, name, r[1], r[3]))
 
 
 def sections(blob):
@@ -107,36 +99,28 @@ def font_map1(bfn):
 
 
 def main():
-    pak = paths.pak()
-    with open(pak, "rb") as f:
-        head = f.read(HEADER_LEN)
-        size1 = struct.unpack_from("<I", head, 0x18)[0]
-        index = decrypt_region(f, HEADER_LEN, size1, "header")
-    recs = entries(index)
-    data_start = HEADER_LEN + len(index)
-
-    arc = load_bmg(pak, data_start, recs, "res/Fontcn/fontres.arc")
+    arc = material.font_arcs()["fontres.arc"]
     start, body, blocks = R.parse_bfn(arc)
     entries_map = font_map1(body)
     print("font MAP1 method3 entries: %d" % len(entries_map))
 
     used = {}
-    msgs = [x[0] for x in recs if x[0].startswith("res/Msgcn/")]
+    msgs = material.msg_arcs()
     print("msg archives: %d" % len(msgs))
-    for name in msgs:
-        blob = load_bmg(pak, data_start, recs, name)
+    for base, blob in msgs:
+        tail = base
         off = blob.find(b"MESG")
         if off < 0:
-            print("  %-28s (no MESG, skipped)" % name.split("/")[-1])
+            print("  %-28s (no MESG, skipped)" % tail)
             continue
         try:
             inner, secs, inf, dat, nent, esize, dat_abs, dat_end = bmg_layout(blob, off)
         except StopIteration:
-            print("  %-28s (no INF1/DAT1, skipped)" % name.split("/")[-1])
+            print("  %-28s (no INF1/DAT1, skipped)" % tail)
             continue
         enc = inner[0x10]
         print("  %-28s entries=%-5d enc=%d sections=%s"
-              % (name.split("/")[-1], nent, enc, [s[0].decode() for s in secs]))
+              % (tail, nent, enc, [s[0].decode() for s in secs]))
         for k in range(nent):
             eo = inf[1] + 0x10 + k * esize
             msg_off = struct.unpack_from(">I", inner, eo)[0]
