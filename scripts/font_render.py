@@ -55,6 +55,7 @@ def _sfnt_tables(data):
 
 
 def _cmap4(data, off):
+    """yield (码位, 字形号)：format 4（BMP 段表）。"""
     seg2 = struct.unpack_from(">H", data, off + 6)[0]
     seg = seg2 // 2
     ends = struct.unpack_from(">%dH" % seg, data, off + 14)
@@ -62,7 +63,6 @@ def _cmap4(data, off):
     deltas = struct.unpack_from(">%dh" % seg, data, off + 16 + 2 * seg2)
     ro_base = off + 16 + 3 * seg2
     rngs = struct.unpack_from(">%dH" % seg, data, ro_base)
-    codes = set()
     for i in range(seg):
         if starts[i] == 0xFFFF and ends[i] == 0xFFFF:
             continue
@@ -77,24 +77,22 @@ def _cmap4(data, off):
                 if g:
                     g = (g + deltas[i]) & 0xFFFF
             if g:
-                codes.add(c)
-    return codes
+                yield c, g
 
 
 def _cmap12(data, off):
+    """yield (码位, 字形号)：format 12（UCS-4 分组）。"""
     n = struct.unpack_from(">I", data, off + 12)[0]
-    codes = set()
     for k in range(n):
         s, e, g = struct.unpack_from(">III", data, off + 16 + k * 12)
         if g == 0:
             continue
         for c in range(s, e + 1):
-            codes.add(c)
-    return codes
+            yield c, g
 
 
-def parse_cmap(path):
-    """解析 TTF/OTF 的 cmap（format 4/12），返回有字形的码位集合。"""
+def _cmap_pairs(path):
+    """[(码位, 字形号)]：全部 format 4 子表 + 第一张 format 12 子表。"""
     with open(path, "rb") as f:
         data = f.read()
     tables = _sfnt_tables(data)
@@ -102,18 +100,44 @@ def parse_cmap(path):
         raise ValueError("no cmap table: %s" % path)
     coff = tables[b"cmap"][0]
     num = struct.unpack_from(">H", data, coff + 2)[0]
-    codes = set()
+    out = []
     seen12 = False
     for i in range(num):
         platform, enc, sub = struct.unpack_from(">HHI", data, coff + 4 + i * 8)
         off = coff + sub
         fmt = struct.unpack_from(">H", data, off)[0]
         if fmt == 12 and not seen12:
-            codes |= _cmap12(data, off)
+            out += list(_cmap12(data, off))
             seen12 = True
         elif fmt == 4:
-            codes |= _cmap4(data, off)
-    return codes
+            out += list(_cmap4(data, off))
+    return out
+
+
+def parse_cmap(path):
+    """解析 TTF/OTF 的 cmap（format 4/12），返回有字形的码位集合。"""
+    return {cp for cp, _ in _cmap_pairs(path)}
+
+
+def read_advances(path):
+    """{码位: 前进宽度}：hmtx / unitsPerEm，以 em 为单位。"""
+    with open(path, "rb") as f:
+        data = f.read()
+    tables = _sfnt_tables(data)
+    for tag in (b"head", b"hhea", b"hmtx"):
+        if tag not in tables:
+            raise ValueError("缺 %s 表：%s" % (tag.decode(), path))
+    upem = struct.unpack_from(">H", data, tables[b"head"][0] + 18)[0]
+    num_h = struct.unpack_from(">H", data, tables[b"hhea"][0] + 34)[0]
+    hmtx = tables[b"hmtx"][0]
+
+    def advance(gid):
+        off = hmtx + (min(gid, num_h - 1) if num_h else 0) * 4
+        return struct.unpack_from(">H", data, off)[0] if off + 2 <= len(data) else upem
+
+    if not upem:
+        return {}
+    return {cp: advance(gid) / float(upem) for cp, gid in _cmap_pairs(path)}
 
 
 # ---------------------------------------------------------------- 名册 / 覆盖
@@ -344,25 +368,65 @@ class Renderer:
             fn.restype = ctypes.c_int
 
         self._path = ctypes.c_void_p()
+        self._measure_path = ctypes.c_void_p()
         self._matrix = ctypes.c_void_p()
         self._bmp = ctypes.c_void_p()
         self._g = ctypes.c_void_p()
         self._brush = ctypes.c_void_p()
         if lib.GdipCreatePath(_FILL_WINDING, ctypes.byref(self._path)) != 0:
             raise RuntimeError("GdipCreatePath failed")
+        if lib.GdipCreatePath(_FILL_WINDING, ctypes.byref(self._measure_path)) != 0:
+            raise RuntimeError("GdipCreatePath failed")
         lib.GdipCreateMatrix(ctypes.byref(self._matrix))
         lib.GdipCreateBitmapFromScan0(self.px, self.px, 0, _PF32, None, ctypes.byref(self._bmp))
         lib.GdipGetImageGraphicsContext(self._bmp, ctypes.byref(self._g))
         lib.GdipSetSmoothingMode(self._g, _SMOOTH_AA)
         lib.GdipCreateSolidFill(0xFFFFFFFF, ctypes.byref(self._brush))
+        self._baseline_cache = {}
         self._closed = False
+
+    def _ink_bottom(self, ch, em_draw):
+        """字形墨迹底边在布局坐标里的 y（只算路径包围盒，不栅格化）。
+
+        用单独的测量 path：render() 先建好要画的字形路径再算基线，
+        两者共用一条 path 会把待画的字形换掉（量基线时往里塞 H/E/T）。
+        """
+        lib = self._lib
+        lib.GdipResetPath(self._measure_path)
+        rect = self._RectF(-em_draw, -em_draw, em_draw * 4, em_draw * 4)
+        st = lib.GdipAddPathString(self._measure_path, ch, 1, self._families[0], 0, em_draw,
+                                   ctypes.byref(rect), None)
+        if st != 0:
+            raise RuntimeError("GdipAddPathString failed %d: %r" % (st, ch))
+        b = self._RectF()
+        lib.GdipGetPathWorldBounds(self._measure_path, ctypes.byref(b), None, None)
+        return b.Y + b.Height
+
+    def baseline_in_path(self, em):
+        """基线在布局坐标里的 y：带方格的字（H E T）底边就落在基线上。
+
+        anchor="baseline" 时用它把字形的基线（而不是墨迹底边）对到目标 y——
+        墨迹底边对齐会把「一」这种单横画压到基线上，看起来像下划线。
+        """
+        em_draw = em * self.super
+        if em_draw not in self._baseline_cache:
+            y = None
+            for ref in "HET":
+                b = self._ink_bottom(ref, em_draw)
+                if b:
+                    y = b
+                    break
+            if y is None:
+                raise RuntimeError("量不到基线：字体里没有 H/E/T")
+            self._baseline_cache[em_draw] = y
+        return self._baseline_cache[em_draw] / self.super
 
     def render(self, ch, em, center=None, anchor="center"):
         """渲染单字到 cell 格。
 
         em: 48 尺度下的字号像素；center: (cx, cy) 目标锚点（48 尺度），
-        anchor=center 时 cy 为墨迹中心、bottom 时 cy 为墨迹底边；默认格中心。
-        返回 (48x48 灰度 bytearray, clipped bool)。"""
+        anchor=center 时 cy 为墨迹中心、bottom 时 cy 为墨迹底边、baseline 时 cy 为基线；
+        默认格中心。返回 (48x48 灰度 bytearray, clipped bool)。"""
         lib = self._lib
         cell, super, px = self.cell, self.super, self.px
         if center is None:
@@ -379,7 +443,9 @@ class Renderer:
         bounds = self._RectF()
         lib.GdipGetPathWorldBounds(self._path, ctypes.byref(bounds), None, None)
         dx = tcx - (bounds.X + bounds.Width / 2.0)
-        if anchor == "bottom":
+        if anchor == "baseline":
+            dy = tcy - self.baseline_in_path(em) * super
+        elif anchor == "bottom":
             dy = tcy - (bounds.Y + bounds.Height)
         else:
             dy = tcy - (bounds.Y + bounds.Height / 2.0)
@@ -425,6 +491,7 @@ class Renderer:
         self._closed = True
         lib = self._lib
         lib.GdipDeletePath(self._path)
+        lib.GdipDeletePath(self._measure_path)
         lib.GdipDeleteMatrix(self._matrix)
         lib.GdipDeleteBrush(self._brush)
         lib.GdipDeleteGraphics(self._g)
@@ -439,13 +506,13 @@ class Renderer:
         self.close()
 
 
-def _fit_render(renderer, char, em, center, tries=4):
+def _fit_render(renderer, char, em, center, tries=4, anchor="bottom"):
     """超界字形按比例缩小重渲（不放大），直到落进格内（底边/中心锚不动）。"""
     cur = em
     clipped = True
     gray = None
     for _ in range(tries):
-        gray, clipped = renderer.render(char, cur, center, anchor="bottom")
+        gray, clipped = renderer.render(char, cur, center, anchor=anchor)
         if not clipped:
             break
         _, by, bw, bh = renderer.last_info["bounds"]
@@ -461,12 +528,14 @@ def _fit_render(renderer, char, em, center, tries=4):
 
 
 def render_atlas(renderer, roster, fields, em=DEFAULT_EM, gamma=DEFAULT_GAMMA,
-                 bboxes=None, place="inherit", limit=None, baseline=DEFAULT_BASELINE):
+                 bboxes=None, place="inherit", limit=None, baseline=DEFAULT_BASELINE,
+                 anchor="bottom"):
     """渲染整页 GLY1 图集（未平铺，值 0..15，高值=墨）。
 
     fields: R.gly1_fields 的输出；bboxes: scan_bboxes 的 {idx: bbox}（inherit 用）；
     place: inherit 时优先对原字形底边中心，否则（新补槽）坐 baseline 基线；
-    place=center 则全部用格中心。返回 (atlas bytearray(texW*texH), stats dict)。"""
+    place=center 则全部用格中心；anchor: 基线的含义（bottom = 墨迹底边，baseline = 字体基线）。
+    返回 (atlas bytearray(texW*texH), stats dict)。"""
     tw, th = fields["textureWidth"], fields["textureHeight"]
     cw, ch = fields["cellWidth"], fields["cellHeight"]
     rows = fields["numRows"]
@@ -488,9 +557,9 @@ def render_atlas(renderer, roster, fields, em=DEFAULT_EM, gamma=DEFAULT_GAMMA,
         else:
             center = (cw / 2.0, float(baseline))
             stats["fallback"] += 1
-        gray, clipped = renderer.render(char, em, center, anchor="bottom")
+        gray, clipped = renderer.render(char, em, center, anchor=anchor)
         if clipped:
-            gray, clipped, used = _fit_render(renderer, char, em, center)
+            gray, clipped, used = _fit_render(renderer, char, em, center, anchor=anchor)
             stats["rescaled"] += 1
         if clipped:
             stats["clipped"] += 1

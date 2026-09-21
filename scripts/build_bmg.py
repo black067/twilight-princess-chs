@@ -260,7 +260,7 @@ def main():
             except UnicodeDecodeError:
                 pass
 
-    mapping = codes.assign(chars)
+    mapping = codes.assign(chars, codes.reserved(paths.DATA))
     codes.save(CODE_JSON, mapping, "译文与控制字符 -> 新码位（%d 个）" % len(mapping))
     print("码位：%d 个字 %#x..%#x -> %s"
           % (len(mapping), min(mapping.values()), max(mapping.values()), CODE_JSON))

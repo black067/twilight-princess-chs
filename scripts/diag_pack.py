@@ -134,7 +134,7 @@ def check_name_keyboard(path, fm):
     """
     kb_path = os.path.join(paths.WORK, "keyboard_aliases.json")
     if not os.path.exists(kb_path):
-        print("名字键盘: 缺 %s（先跑 patch_sjis_font）" % kb_path)
+        print("名字键盘: 缺 %s（先生成字库）" % kb_path)
         return
     with open(kb_path, encoding="utf-8") as f:
         doc = json.load(f)

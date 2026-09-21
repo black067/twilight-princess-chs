@@ -30,10 +30,10 @@
 #    work/fonts/LXGWWenKai-Regular.ttf     霞鹜文楷（OFL-1.1）
 #    cn/font/fontres.arc.yaz0  cn/font/rubyres.arc.yaz0  cn/msg/bmgres*.arc.yaz0
 
-# 1) 移植管线（可调项与完整命令见 docs/管线复现.md）
-python scripts/sjis_map.py                 # 码位映射 → work/sjis_map.json
-python scripts/patch_sjis_font.py          # 字库：开源字体重渲染 + 名字键盘补全
-python scripts/patch_sjis_text.py          # 消息重编码
+# 1) 打包管线（容器与字库都从零生成；可调项与就地改写路线见 docs/管线复现.md）
+python scripts/build_bmg.py --code-space own   # 消息容器（顺带写 work/code_map.json）
+python scripts/build_bfn.py                    # 两套字库（读同一份码位表）→ work/scratch_parts/
+Copy-Item work\scratch_parts\*.arc work\sjis_parts\ -Force   # 零件归位到打包目录
 python scripts/diag_pack.py                # 验收：未正常结束 0 条、缺字 0 次
 python scripts/build_sjis_pack.py --check  # 先校验 mod.json 元数据
 python scripts/build_sjis_pack.py          # 打包 → dist/yiga_zh_hans_<region>.dusk（3 个地区）
