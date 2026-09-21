@@ -180,9 +180,9 @@ def main():
     if not variants:
         sys.exit("--variant 只支持 %s" % " / ".join(v for v, _ in paths.VARIANTS))
     if not variant_filter:
-        # 对外发布只出 PUBLISHED_VARIANTS；其余变体要在本机打得显式给 --variant
+        # 不带 --variant 时只打 PUBLISHED_VARIANTS，其余变体要显式指定
         variants = [v for v in variants if v in paths.PUBLISHED_VARIANTS]
-        print("默认只打对外发布的变体：%s（其余用 --variant 指定）" % " / ".join(variants))
+        print("只打 %s（其余用 --variant 指定）" % " / ".join(variants))
 
     out_dir = paths.out_dir()
     os.makedirs(out_dir, exist_ok=True)

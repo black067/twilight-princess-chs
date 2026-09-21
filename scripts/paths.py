@@ -19,7 +19,7 @@ CONFIG_EXAMPLE = os.path.join(HERE, "config.example.json")
 # 两个成品变体：(变体名, config 里的元信息段)。字库部件目录也在 work 下由这里定，
 # 字库/打包/安装脚本共用，避免各写一份。
 VARIANTS = (("open", "mod"), ("bmp", "mod_bmp"))
-# 对外发布的变体；另一个变体（保留原字库位图）只在本机用 --variant 打
+# 不带 --variant 时打的变体（其余变体要在命令行显式指定）
 PUBLISHED_VARIANTS = ("open",)
 PARTS_DIR = {"open": "sjis_parts", "bmp": "sjis_parts.bmp"}
 # 字库部件文件名：不带槽位，同一个部件要写进各地区的 Font<region> 目录

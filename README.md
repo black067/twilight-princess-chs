@@ -3,8 +3,7 @@
 塞尔达传说：黄昏公主的汉化 mod，用于 [dusklight](https://github.com/TwilitRealm/dusklight)
 
 > **本仓库只有脚本与文档**
-> 游戏素材（文本、字库、导出的 `cn/` 素材、打出来的 `.dusk` 成品包）**请自行准备**：
-> 用你自己持有的正版拷贝在本地导出，输入格式见 [docs/管线复现.md](docs/管线复现.md)
+> 输入素材（`cn/`）与产物（`dist/`、`work/`）都不在仓库里；输入格式见 [docs/管线复现.md](docs/管线复现.md)
 
 **现状**：中文文本与中文字库已全部就位，全部游戏内文本的中文已在 dusklight 上跑通——
 标题提示、存档界面、对话、菜单、栏位文字、电视设置页面都正常，主角名与马名正常，中文名字键盘可用。
@@ -26,7 +25,7 @@
 ## 快速开始
 
 ```pwsh
-# 0) 自备开源字体与素材
+# 0) 输入：开源字体与 cn/ 素材
 #    work/fonts/NotoSansCJKsc-Regular.otf  思源黑体 / Noto Sans CJK SC（OFL-1.1）
 #    work/fonts/LXGWWenKai-Regular.ttf     霞鹜文楷（OFL-1.1）
 #    cn/font/fontres.arc.yaz0  cn/font/rubyres.arc.yaz0  cn/msg/bmgres*.arc.yaz0
@@ -54,8 +53,8 @@ python scripts/install.py --region us      # --list 只看现状
    `dist/<id>.dusk` 放进游戏的 mod 目录，再把该包在配置里的 `mod.<id>.enabled` 置 `true`。
    mod 目录与配置路径由 `config.json` 的 `mods_dir` / `game_config` 指定（dusklight 2.x 是 exe 同级的
    `mods/` 与数据目录下的 `config.json`，dusk-cn 是 `<游戏目录>/data/` 下的那两个）。
-3. 游戏镜像需自备正版：三个地区的盘各出一份包（美版 `Fontus`/`Msgus`、欧版法语槽 `Fonteu`/`Msgfr`、
-   日版 `Fontjp`/`Msgjp`），本项目在 GameCube 欧版 + `game.language = 2`（法语槽）上验证。
+3. 三个地区的盘各出一份包（美版 `Fontus`/`Msgus`、欧版法语槽 `Fonteu`/`Msgfr`、日版 `Fontjp`/`Msgjp`）；
+   本项目在 GameCube 欧版 + `game.language = 2`（法语槽）上验证。
 4. 验证：标题提示、存档、对话、菜单、栏位文字应为简体中文，名字框默认名「林克 / 伊波娜」可正常显示；
    日志在 `%APPDATA%\TwilitRealm\Dusklight\logs\`。旧存档的名字是旧码位，会显示成错字——新建存档或重输一次名字。
 
@@ -73,8 +72,7 @@ python scripts/install.py --region us      # --list 只看现状
 ## 许可与免责
 
 - **代码与文档**：MIT 许可，见 [LICENSE](LICENSE)。
-- **不含游戏素材**：文本、字库、游戏数据及其派生成品包都不在仓库里；请用你自己持有的正版拷贝
-  在本地导出素材（见 [docs/管线复现.md](docs/管线复现.md)）。这些素材的版权归各原权利人所有，
+- **不含游戏素材**：文本、字库、游戏数据及其派生成品包都不在仓库里；版权归各原权利人所有，
   不属于本仓库的许可范围。
 - **开源字体**：字形由思源黑体 / Noto Sans CJK SC 与霞鹜文楷（均 OFL-1.1）渲染，字体文件需自行下载、
   放 `work/fonts/`；渲染出的位图随成品包分发，建议在站点页面注明所用字体与许可。
