@@ -17,7 +17,6 @@ from gly1_single_page import patch_rarc, repack_bfn
 
 MAP_JSON = paths.sjis_map_json()
 NAME_KEYBOARD = os.path.join(paths.DATA, "name_keyboard.json")
-# open 输出的字库与 --code-space sjis 的文本配套，不能写进 sjis_parts（own 空间的部件目录）
 OPEN_SPACE = "sjis"
 KB_JSON = paths.kb_json(OPEN_SPACE)
 

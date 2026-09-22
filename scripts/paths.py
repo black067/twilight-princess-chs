@@ -23,7 +23,7 @@ VARIANTS = ((OPEN_VARIANT, "mod"), (ORIGIN_VARIANT, "mod_origin"))
 # 不带 --variant 时打的变体（其余变体要在命令行显式指定）
 PUBLISHED_VARIANTS = (OPEN_VARIANT,)
 # 部件目录（字库 + 文本）也在 work 下由这里定：一个变体一个目录，两条路线各写各的
-PARTS_DIR = {OPEN_VARIANT: "sjis_parts", ORIGIN_VARIANT: "sjis_parts.origin"}
+PARTS_DIR = {OPEN_VARIANT: "parts.open", ORIGIN_VARIANT: "parts.origin"}
 # 字库部件文件名：不带槽位，同一个部件要写进各地区的 Font<region> 目录
 FONT_PART_NAMES = ("fontres.arc", "rubyres.arc")
 
@@ -48,7 +48,7 @@ def text_parts(variant):
 # 字库与文本必须同一码位空间，所以中间产物目录与键盘期望表都按空间分开
 CODE_SPACES = ("own", "sjis")
 DEFAULT_CODE_SPACE = "own"
-SCRATCH_DIR = {"own": "scratch_parts", "sjis": "scratch_parts.sjis"}
+SCRATCH_DIR = {"own": "parts.open.own", "sjis": "parts.open.sjis"}
 KB_JSON = {"own": "keyboard_aliases.json", "sjis": "keyboard_aliases.sjis.json"}
 
 
