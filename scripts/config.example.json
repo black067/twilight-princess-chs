@@ -5,13 +5,67 @@
     "mods_dir": "<游戏的 mod 目录（放 .dusk）：dusklight 2.x 是 exe 同级的 mods/，dusk-cn 是 <游戏目录>/data/mods/>",
     "game_config": "<游戏配置 json：dusklight 2.x 是数据目录下的 config.json，dusk-cn 是 <游戏目录>/data/config.json>",
 
-    "discs": [
-        { "region": "us", "language": "us" },
-        { "region": "eu", "language": "fr" },
-        { "region": "jp", "language": "jp" }
-    ],
+    "default_lang": "zh-Hans",
+    "font_source": "cn/font",
+    "langs": {
+        "zh-Hans": {
+            "source": "cn/msg",
+            "draft_col": "cn",
+            "locale_col": "zh-Hans",
+            "default_name_chars": "林克伊波娜",
+            "default_name_cells": [ "zel_00/898", "zel_00/899" ],
+            "discs": [
+                { "region": "us", "language": "us" },
+                { "region": "eu", "language": "fr" },
+                { "region": "jp", "language": "jp" }
+            ],
+            "mod": {
+                "id": "yiga.zh.hans.{region}",
+                "name": "Chinese (Simplified) Translation",
+                "version": "1.0.0",
+                "author": "Yiga Clan",
+                "description": "A Chinese (Simplified) translation mod",
+                "icon": "assets/icon.png",
+                "banner": "assets/banner.png"
+            },
+            "mod_origin": {
+                "id": "yiga.zh.hans.{region}.orig",
+                "name": "Chinese (Simplified) Translation (bitmap font)",
+                "version": "1.0.0",
+                "author": "Yiga Clan",
+                "description": "A Chinese (Simplified) translation mod",
+                "icon": "assets/icon.png",
+                "banner": "assets/banner.png"
+            }
+        },
+        "en": {
+            "source": "cn/msg_us",
+            "draft_col": "en",
+            "locale_col": "en",
+            "discs": [
+                { "region": "us", "language": "us" }
+            ],
+            "mod": {
+                "id": "yiga.en.{region}",
+                "name": "English (US) Text Repack",
+                "version": "1.0.0",
+                "author": "Yiga Clan",
+                "description": "Repacks the game's own English (US) text with the open-source font set.",
+                "icon": "assets/icon.png",
+                "banner": "assets/banner.png"
+            },
+            "mod_origin": {
+                "id": "yiga.en.{region}.orig",
+                "name": "English (US) Text Repack (bitmap font)",
+                "version": "1.0.0",
+                "author": "Yiga Clan",
+                "description": "Repacks the game's own English (US) text, keeping the original bitmap font.",
+                "icon": "assets/icon.png",
+                "banner": "assets/banner.png"
+            }
+        }
+    },
 
-    "glyph_source": "open",
     "fonts": {
         "fontres": {
             "file": "work/fonts/NotoSansCJKsc-Regular.otf",
@@ -25,23 +79,5 @@
         }
     },
 
-    "repo": "https://github.com/black067/twilight-princess-chs",
-    "mod": {
-        "id": "yiga.zh.hans.{region}",
-        "name": "Chinese (Simplified) Translation",
-        "version": "1.0.0",
-        "author": "Yiga Clan",
-        "description": "A Chinese (Simplified) translation mod",
-        "icon": "assets/icon.png",
-        "banner": "assets/banner.png"
-    },
-    "mod_origin": {
-        "id": "yiga.zh.hans.{region}.orig",
-        "name": "Chinese (Simplified) Translation (bitmap font)",
-        "version": "1.0.0",
-        "author": "Yiga Clan",
-        "description": "A Chinese (Simplified) translation mod",
-        "icon": "assets/icon.png",
-        "banner": "assets/banner.png"
-    }
+    "repo": "https://github.com/black067/twilight-princess-chs"
 }

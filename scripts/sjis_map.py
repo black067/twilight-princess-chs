@@ -12,7 +12,7 @@ import bfn_repack as R
 import material
 import paths
 
-OUT = os.path.join(paths.WORK, "sjis_map.json")
+OUT = paths.sjis_map_json()
 NAME_KEYBOARD = os.path.join(paths.DATA, "name_keyboard.json")
 
 NAME_KEYBOARD_REFMARK = 0x203B  # ※：文本里用来替掉 MSGTAG_REFMARK 插入的 1 字节 0x89

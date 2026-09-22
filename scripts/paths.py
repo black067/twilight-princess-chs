@@ -1,7 +1,8 @@
 """外部路径与默认配置的统一入口。
 
 config.example.json 是完整默认值（路径字段写 <占位符>）；config.json 只写本机差异；
---xxx 命令行再覆盖。两者递归合并。
+--xxx 命令行再覆盖。两者递归合并。langs 段由 --lang 选用（缺省 default_lang）：
+source / draft_col / locale_col / discs / mod / mod_origin，中间产物落在 work/<lang>/。
 """
 
 import json
@@ -31,8 +32,8 @@ FONT_PART_NAMES = ("fontres.arc", "rubyres.arc")
 
 
 def parts_dir(variant):
-    """变体的部件目录（work/ 下）：两条路线各出自己的字库与文本，不互相覆盖。"""
-    return os.path.join(WORK, PARTS_DIR[variant])
+    """变体的部件目录（work/<lang>/ 下）：两条路线各出自己的字库与文本，不互相覆盖。"""
+    return os.path.join(work_dir(), PARTS_DIR[variant])
 
 
 def font_parts(variant):
@@ -47,11 +48,43 @@ def text_parts(variant):
         return []
     return [(n, os.path.join(d, n)) for n in sorted(os.listdir(d)) if n.startswith("bmgres")]
 
+# 字库与文本必须同一码位空间，所以中间产物目录与键盘期望表都按空间分开
+CODE_SPACES = ("own", "sjis")
+DEFAULT_CODE_SPACE = "own"
+SCRATCH_DIR = {"own": "scratch_parts", "sjis": "scratch_parts.sjis"}
+KB_JSON = {"own": "keyboard_aliases.json", "sjis": "keyboard_aliases.sjis.json"}
+
+
+def scratch_dir(space=DEFAULT_CODE_SPACE):
+    return os.path.join(work_dir(), SCRATCH_DIR[space])
+
+
+def kb_json(space=DEFAULT_CODE_SPACE):
+    return os.path.join(work_dir(), KB_JSON[space])
+
+
+def code_map_json():
+    return os.path.join(work_dir(), "code_map.json")
+
+
+def sjis_map_json():
+    return os.path.join(work_dir(), "sjis_map.json")
+
+
+def msg_index_json():
+    return os.path.join(DATA, "msg_index.%s.json" % lang())
+
+
+def font_source_dir():
+    """参照字库目录（lang 段 font_source，缺省 cn/font）。"""
+    value = lang_value("font_source") or "cn/font"
+    return value if os.path.isabs(value) else os.path.join(ROOT, value)
+
+
 # 命令行参数 -> 配置字段
 KEYS = {
     "--exe": "dusklight_exe",
     "--cn-font": "cn_font",
-    "--glyph-source": "glyph_source",
     "--em": "em",
     "--mods-dir": "mods_dir",
     "--game-config": "game_config",
@@ -134,6 +167,73 @@ def config_dir(key, default):
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
+def _langs():
+    langs = config_value("langs")
+    if not isinstance(langs, dict) or not langs:
+        sys.exit("%s 里缺 langs（每个语言一段：source / draft_col / locale_col / discs / mod）"
+                 % CONFIG)
+    return langs
+
+
+def lang():
+    """本次作业的语言（--lang，缺省 default_lang；配置里只有一个时就用它）。"""
+    name = cli("--lang") or config_value("default_lang")
+    langs = _langs()
+    if not name:
+        if len(langs) == 1:
+            return next(iter(langs))
+        sys.exit("配置里有 %d 个语言，用 --lang 指定（%s）"
+                 % (len(langs), " / ".join(sorted(langs))))
+    if name not in langs:
+        sys.exit("--lang %s 不在配置的 langs 里（%s）" % (name, " / ".join(sorted(langs))))
+    return name
+
+
+def lang_config():
+    """当前语言的全量配置：lang 段递归覆盖顶层（顶层 fonts 是默认值，lang 段可只覆盖要改的）。"""
+    return _overlay(_config(), _langs()[lang()])
+
+
+def lang_value(key, default=None):
+    value = lang_config().get(key)
+    return default if value is None else value
+
+
+def work_dir():
+    """当前语言的中间产物根目录（work/<lang>/）。"""
+    return os.path.join(WORK, lang())
+
+
+def source_dir():
+    """lang 段的 source：该语言要导出的解包素材目录。"""
+    value = lang_value("source")
+    if not value:
+        sys.exit("%s 的 langs.%s 里缺 source（解包素材目录）" % (CONFIG, lang()))
+    return value if os.path.isabs(value) else os.path.join(ROOT, value)
+
+
+def texts_file():
+    """译文表：cn/texts.<lang>.csv（与素材放在一起）。"""
+    return os.path.join(CN, "texts.%s.csv" % lang())
+
+
+def _col(key):
+    value = lang_value(key)
+    if not value:
+        sys.exit("%s 的 langs.%s 里缺 %s（列名）" % (CONFIG, lang(), key))
+    return value
+
+
+def draft_col():
+    """底稿列（导出时从素材读出来的原文）。"""
+    return _col("draft_col")
+
+
+def locale_col():
+    """译文列（打包只读它）。"""
+    return _col("locale_col")
+
+
 def option(name):
     """命令行 > 配置文件；两者都没有返回 None。"""
     value = _option(name)
@@ -145,6 +245,13 @@ def option(name):
 def cli(name):
     """只看命令行的开关（--region / --variant 这类只在本次调用生效）。"""
     return _option(name)
+
+
+def code_space():
+    space = cli("--code-space") or DEFAULT_CODE_SPACE
+    if space not in CODE_SPACES:
+        sys.exit("--code-space 只支持 %s（现在 %r）" % (" / ".join(CODE_SPACES), space))
+    return space
 
 
 def _need(name, what):
@@ -167,10 +274,10 @@ def dusklight_exe():
 
 
 def discs():
-    """[(region, language)]：config 的 discs，逐个校验。"""
-    raw = config_value("discs")
+    """[(region, language)]：当前语言的 discs，逐个校验。"""
+    raw = lang_value("discs")
     if not isinstance(raw, list) or not raw:
-        sys.exit("%s 里缺 discs（每个盘一项 {region, language}）" % CONFIG)
+        sys.exit("%s 的 langs.%s 里缺 discs（每个盘一项 {region, language}）" % (CONFIG, lang()))
     out = []
     for item in raw:
         region = str((item or {}).get("region") or "").lower()
@@ -232,19 +339,20 @@ def escape_mod_id(mod_id):
 
 
 def out_dir():
-    """成品包目录（config 的 out）。"""
-    value = config_value("out")
+    """成品包目录（out：顶层默认，lang 段可覆盖）。"""
+    value = lang_value("out")
     if not value:
         sys.exit("%s 里缺 out（成品包目录）" % CONFIG)
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
 def mod_meta(variant, region, language):
-    """变体在某地区的元信息：展开 config 里它那段（VARIANTS 的第二项）的占位符。"""
+    """变体在某地区的元信息：展开当前语言的它那段（VARIANTS 的第二项）的占位符。"""
     key = dict(VARIANTS)[variant]
-    meta = config_value(key)
+    meta = lang_value(key)
     if not isinstance(meta, dict) or not meta.get("id"):
-        sys.exit("%s 里缺 %s 段（id/name/version/author/description）" % (CONFIG, key))
+        sys.exit("%s 的 langs.%s 里缺 %s 段（id/name/version/author/description）"
+                 % (CONFIG, lang(), key))
     out = dict(meta)
     out["id"] = expand_id(str(out["id"]), region, language)
     for field in ("name", "description"):

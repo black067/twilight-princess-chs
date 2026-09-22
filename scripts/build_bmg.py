@@ -1,7 +1,7 @@
 """从零生成消息归档：RARC 与 BMG 全部自己写，只吃「索引表 + 形状表 + 译文」。
 
 输入
-  data/msg_index.json        容器索引（BMG 名、条数、entrySize、groupID、MID1、条目属性、尾部块）
+  data/msg_index.<lang>.json 容器索引（BMG 名、条数、entrySize、MID1、条目属性、尾部块）
   data/text_resources.json   文本资源形状（哪些资源、每格叫什么）
   cn/texts.csv               译文（`key` + `zh-Hans`）
   原样带过的块               FLW1/FLI1 流脚本（无正文文本）
@@ -33,13 +33,12 @@ import text_resources as TR
 import texts
 import yaz0
 
-INDEX_JSON = os.path.join(paths.DATA, "msg_index.json")
-CODE_JSON = os.path.join(paths.WORK, "code_map.json")
+CODE_JSON = paths.code_map_json()
 ENCODING = 3
 
-TEXTS = paths.cli("--texts") or texts.FILE
-SPACE = paths.cli("--code-space") or "own"     # own=自分配码位；sjis=沿用现有字库的码位
-OUT_DIR = os.path.join(paths.WORK, "scratch_parts" if SPACE == "own" else "scratch_parts.%s" % SPACE)
+TEXTS = paths.cli("--texts") or texts.file()
+SPACE = paths.code_space()                     # own=自分配码位；sjis=沿用现有字库的码位
+OUT_DIR = paths.scratch_dir(SPACE)
 
 
 def block(tag, payload):
@@ -56,13 +55,16 @@ def build_messages(src, spec, resource, rows, remap, default_names=False):
     assert len(ids) == n, (len(ids), n)
     attrs = expand_attrs(spec)                  # 条目属性（说话人/框样式/文字速度…）
     assert esize == 6 + len(attrs[0]), (esize, len(attrs[0]))
+    names = PSF.name_default_chars() if default_names else ""
+    keys = TR.message_keys(resource, ids)
+    name_cells = set(PSF.default_name_cells())
 
     dat = bytearray()
     offsets = []
     for k in range(n):
-        tokens = texts.parse_literal(rows["%s/%d" % (resource, ids[k])])
+        tokens = texts.parse_literal(rows[keys[k]])
         offsets.append(len(dat))
-        if default_names and k in PST.NAME_MSG_OVERRIDES:
+        if names and keys[k] in name_cells:
             # 名字框逐字节取字，默认名写单字节码位（见 docs「名字与键盘」）
             dat += PST.default_name_bytes("".join(chr(t[1]) for t in tokens if t[0] == "chr"))
             dat += b"\x00\x00"
@@ -248,7 +250,7 @@ def main():
                 need(chr(tok[1]))
     for ch in PSF.ICON_ALIAS.values():
         need(chr(ch))
-    for ch in PSF.NAME_DEFAULT_CHARS:
+    for ch in PSF.name_default_chars():
         need(ch)
     need(chr(PST.REFMARK_CHAR))
     with open(os.path.join(paths.DATA, "name_keyboard.json"), encoding="utf-8") as f:
@@ -267,7 +269,7 @@ def main():
         remap = {ord(ch): code for ch, code in mapping.items()}
     else:
         # 沿用现有字库的码位空间（`sjis_map.py` 的 remap：原码位 -> 现有字库的码位）
-        with open(os.path.join(paths.WORK, "sjis_map.json"), encoding="utf-8") as f:
+        with open(paths.sjis_map_json(), encoding="utf-8") as f:
             remap = {int(k, 16): int(v, 16) for k, v in json.load(f)["remap"].items()}
         print("码位空间：%s（沿用现有字库 %d 条重映射）" % (SPACE, len(remap)))
 

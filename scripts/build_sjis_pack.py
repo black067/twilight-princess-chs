@@ -149,7 +149,7 @@ def overlay_entries(variant, region, language):
 def build(variant, meta, region, language, out_dir, check_only=False):
     """打一个变体在一个地区的包。"""
     meta = select_fields(meta, variant)
-    print("== %s 变体 / %s 盘 ==" % (variant, region))
+    print("== %s：%s 变体 / %s 盘 ==" % (paths.lang(), variant, region))
     print_meta(meta)
     check_meta(meta)
     images = collect_images(meta)      # --check 也过一遍图片（存在性 + PNG 尺寸）

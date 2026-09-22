@@ -1,10 +1,11 @@
 """验收判定：按引擎 ShiftJIS 路径解码包内文本，检查
   1) 消息是否会在中途被判为结束（对白切断）
   2) 画出来的码位是否都在补丁字库里（缺字）
-  3) 名字键盘（l_mojiZh）550 格是否与构建产出的期望表（work/keyboard_aliases.json）
+  3) 名字键盘（l_mojiZh）550 格是否与构建产出的期望表（`paths.kb_json(space)`）
      一致，且补全槽的像素非空（只对 open 变体：键盘补全是它独有的）
 
 跑哪个变体由 --variant 定（不给时 open）：变体自己那份字库与文本部件。
+--code-space 定键盘期望表（`own` / `sjis`）。
 
 引擎路径（源码）：
   parseCharacter_ShiftJIS: 首字节不是前导(0x81-0x9F/0xE0-0xFC) => 只吃 1 字节
@@ -129,12 +130,11 @@ def scan(path, fc):
     }
 
 
-def check_name_keyboard(path, fm):
+def check_name_keyboard(path, fm, kb_path):
     """名字键盘 550 格逐格核对：
     1) 补丁字库里该码位的字形与 patch_sjis_font 落盘的期望表一致；
     2) 补全槽（新增渲染的格子）像素非空。
     """
-    kb_path = os.path.join(paths.WORK, "keyboard_aliases.json")
     if not os.path.exists(kb_path):
         print("名字键盘: 缺 %s（先生成字库）" % kb_path)
         return
@@ -178,10 +178,11 @@ def main():
     variant = paths.cli("--variant") or paths.OPEN_VARIANT
     if variant not in paths.PARTS_DIR:
         sys.exit("--variant 只支持 %s" % " / ".join(paths.PARTS_DIR))
+    space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
     fontres_path = dict(paths.font_parts(variant))["fontres.arc"]
     fm = font_map(fontres_path)
     fc = set(fm)
-    print("字库码位: %d（%s 变体）" % (len(fc), variant))
+    print("字库码位: %d（%s 变体 / %s 码位空间）" % (len(fc), variant, space))
     tot = collections.Counter()
     tot_missing = collections.Counter()
     msgs = 0
@@ -201,10 +202,9 @@ def main():
         print("   缺字码位 %04X x%-5d %s" % (c, n, chr(c) if 0x20 < c < 0xFFFF else "?"))
     print()
     if variant == paths.OPEN_VARIANT:
-        check_name_keyboard(fontres_path, fm)
+        check_name_keyboard(fontres_path, fm, paths.kb_json(space))
     else:
-        print("名字键盘: 跳过（键盘补全只对 %s 变体成立，work/keyboard_aliases.json 是它的表）"
-              % paths.OPEN_VARIANT)
+        print("名字键盘: 跳过（键盘补全只对 %s 变体成立）" % paths.OPEN_VARIANT)
 
 
 main()

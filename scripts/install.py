@@ -100,7 +100,7 @@ def main():
         shutil.copyfile(src, dst)
     except PermissionError:
         sys.exit("写入被拒：%s。游戏正在运行会占住这个文件，请先完全退出游戏。" % dst)
-    print("installed -> %s（%s 变体 / %s 盘）" % (dst, variant, region))
+    print("installed -> %s（%s：%s 变体 / %s 盘）" % (dst, paths.lang(), variant, region))
 
     # 其余地区/变体的包要清掉：它们覆盖同一批资源，同时留着可能被同时加载
     for other_variant, other_region, _l, _i, other_path in all_jobs:
@@ -124,7 +124,7 @@ def main():
 
     # 改过 id / 改过包名的旧包脚本管不着，这里只提醒（同一作者才可能与本 mod 重叠）
     our_ids = {i for *_, i, _ in all_jobs}
-    authors = {str((paths.config_value(k) or {}).get("author") or "")
+    authors = {str((paths.lang_value(k) or {}).get("author") or "")
                for _, k in paths.VARIANTS}
     for name, mod_id, mod_author in known_mods(mods_dir):
         if not mod_id or mod_id in our_ids:

@@ -1,11 +1,12 @@
 """cn/ 素材读取层。
 
-字库与消息归档由使用者自备，放在 cn/ 下（Yaz0 压缩的 RARC）。
+字库与消息归档由使用者自备（Yaz0 压缩的 RARC）。
 
-  cn/font/fontres.arc.yaz0   cn/font/rubyres.arc.yaz0     字库（RARC 内是 BFN）
-  cn/msg/bmgres.arc.yaz0 …   cn/msg/bmgres99.arc.yaz0     消息库（RARC 内是 BMG）
+  <font_source>/fontres.arc.yaz0   rubyres.arc.yaz0     字库（RARC 内是 BFN）
+  <lang 的 source 目录>/bmgres.arc.yaz0 …                消息库（RARC 内是 BMG）
 
 文件名就是部件名加 .yaz0，部件名与打包时写进包内的一致（fontres.arc / bmgres.arc）。
+字库目录由 lang 段的 font_source 定（缺省 cn/font）；消息库取 lang 段的 source。
 """
 
 import os
@@ -15,8 +16,6 @@ import sys
 import paths
 import yaz0
 
-FONT_DIR = os.path.join(paths.CN, "font")
-MSG_DIR = os.path.join(paths.CN, "msg")
 SUFFIX = ".yaz0"
 
 
@@ -36,13 +35,13 @@ def _load(dirpath, what):
 
 
 def font_arcs():
-    """{部件名: RARC}：字库部件（fontres.arc / rubyres.arc）。"""
-    return dict(_load(FONT_DIR, "字库"))
+    """{部件名: RARC}：参照字库部件（fontres.arc / rubyres.arc）。"""
+    return dict(_load(paths.font_source_dir(), "字库"))
 
 
 def msg_arcs():
-    """[(部件名, RARC)]：消息库部件（bmgres.arc / bmgres1.arc …）。"""
-    return _load(MSG_DIR, "消息库")
+    """[(部件名, RARC)]：当前语言的源素材目录下的消息库部件（bmgres.arc / bmgres1.arc …）。"""
+    return _load(paths.source_dir(), "消息库")
 
 
 def rarc_files(arc):

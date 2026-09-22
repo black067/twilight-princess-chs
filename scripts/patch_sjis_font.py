@@ -15,9 +15,11 @@ import paths
 import yaz0
 from gly1_single_page import patch_rarc, repack_bfn
 
-MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
+MAP_JSON = paths.sjis_map_json()
 NAME_KEYBOARD = os.path.join(paths.DATA, "name_keyboard.json")
-KB_JSON = os.path.join(paths.WORK, "keyboard_aliases.json")
+# open 输出的字库与 --code-space sjis 的文本配套，不能写进 sjis_parts（own 空间的部件目录）
+OPEN_SPACE = "sjis"
+KB_JSON = paths.kb_json(OPEN_SPACE)
 
 SHIFT_JIS_FONT_TYPE = 2
 
@@ -59,11 +61,19 @@ PAL_KEY_CODES = (
 )
 PAL_KEY_CHAR = {0x8C: "\u0152", 0x9C: "\u0153"}
 
-# 默认名（主角/马）用的单字节码位：一个字 = 一个 0xA1.. 码位。
-# 名字框逐字节取字符，而 0xA0..0xDF 在 ShiftJIS 里不是前导字节，字体与消息两条
-# 路径都当成完整码位；机制与代价见 docs/技术备忘.md 的「名字与键盘」。
-NAME_DEFAULT_CHARS = "林克伊波娜"
+# 默认名（主角/马）用的单字节码位：一个字 = 一个 0xA1.. 码位。字表在 lang 段的
+# default_name_chars（空 = 不改写默认名）。名字框逐字节取字符，而 0xA0..0xDF 在 ShiftJIS 里不是
+# 前导字节，字体与消息两条路径都当成完整码位；机制与代价见 docs/技术备忘.md 的「名字与键盘」。
 NAME_DEFAULT_BASE = 0x00A1
+
+
+def name_default_chars():
+    return str(paths.lang_value("default_name_chars") or "")
+
+
+def default_name_cells():
+    """要按单字节码位写的格子键（lang 段 default_name_cells；文本取自译文表）。"""
+    return [str(key) for key in (paths.lang_value("default_name_cells") or ())]
 
 
 class SlotPool:
@@ -159,14 +169,18 @@ def name_keyboard_aliases(orig_glyph, pool, open_mode=False):
 
 
 def name_default_aliases(orig_glyph):
-    """0xA1.. → NAME_DEFAULT_CHARS 各字在字库里的既有字形槽（不新增槽、不重渲染）。"""
+    """0xA1.. → default_name_chars 各字在字库里的既有字形槽（不新增槽、不重渲染）。"""
+    chars = name_default_chars()
+    if not chars:
+        print("   默认名单字节别名: 跳过（lang 段没配 default_name_chars）")
+        return ()
     aliases = []
-    for i, char in enumerate(NAME_DEFAULT_CHARS):
+    for i, char in enumerate(chars):
         glyph = orig_glyph.get(ord(char))
         assert glyph is not None, "字库里没有默认名字的字形：%r" % char
         aliases.append((NAME_DEFAULT_BASE + i, glyph))
     print("   默认名单字节别名: %d 条 (%s -> %#x..%#x)"
-          % (len(aliases), NAME_DEFAULT_CHARS, aliases[0][0], aliases[-1][0]))
+          % (len(aliases), chars, aliases[0][0], aliases[-1][0]))
     return aliases
 
 
@@ -202,8 +216,8 @@ def add_aliases(body, blocks, orig_glyph, remap, kb_aliases):
 
 
 def font_settings(name, cli_ttf, cli_em):
-    """每套字库的 (ttf, em, gamma)：config 的 fonts.<name> 为准（fontres 正文 / rubyres 小字）。"""
-    cfg = paths.config_value("fonts")
+    """每套字库的 (ttf, em, gamma)：当前语言的 fonts.<name> 为准。"""
+    cfg = paths.lang_value("fonts")
     cfg = cfg.get(name) if isinstance(cfg, dict) else None
     cfg = cfg if isinstance(cfg, dict) else {}
     ttf = cli_ttf or cfg.get("file")
@@ -217,25 +231,24 @@ def main():
         doc = json.load(f)
     remap = {int(k, 16): int(v, 16) for k, v in doc["remap"].items()}
 
-    source = paths.option("--glyph-source") or "original"
+    # 只认命令行：open 必须显式指定，否则会写脏 own 空间的部件目录
+    source = paths.cli("--glyph-source") or "original"
     cli_ttf = None
     if source != "original":
         if not source.startswith("open"):
             sys.exit("--glyph-source 只支持 original 或 open[:<ttf>]：%s" % source)
         cli_ttf = source.split(":", 1)[1] if ":" in source else None
     cli_em = paths.option("--em")
-    # original 字库只产出 origin 变体（字节回归/预览用）；否则一次产出两个
-    wanted = ((paths.ORIGIN_VARIANT,) if source == "original"
-              else tuple(v for v, _ in paths.VARIANTS))
+    if source == "original":
+        jobs = [(paths.ORIGIN_VARIANT, paths.parts_dir(paths.ORIGIN_VARIANT))]
+    else:
+        jobs = [(paths.OPEN_VARIANT, paths.scratch_dir(OPEN_SPACE))]
 
-    # 两套字库的 arc 只读一次，两个变体共用
+    # 两套字库的 arc 只读一次
     arcs = material.font_arcs()
 
     kb_tables = {}
-    for variant, _ in paths.VARIANTS:
-        if variant not in wanted:
-            continue
-        out_dir = paths.parts_dir(variant)
+    for variant, out_dir in jobs:
         print("### 变体 %s -> %s" % (variant, out_dir))
         os.makedirs(out_dir, exist_ok=True)
         build_font(arcs, remap, variant, out_dir, cli_ttf, cli_em, kb_tables)
@@ -243,9 +256,10 @@ def main():
     if kb_tables:
         with open(KB_JSON, "w", encoding="utf-8") as f:
             json.dump(kb_tables, f, ensure_ascii=False, indent=1)
-        print("wrote %s" % KB_JSON)
+        print("wrote %s（%s 码位空间，搭配 build_bmg.py --code-space %s）"
+              % (KB_JSON, OPEN_SPACE, OPEN_SPACE))
     else:
-        print("跳过 %s（本次没跑 %s 变体）" % (KB_JSON, paths.OPEN_VARIANT))
+        print("没写 %s（只有 --glyph-source open 才写它）" % KB_JSON)
 
 
 def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
@@ -355,7 +369,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
                 },
                 "name_default": {
                     "aliases": [["%04X" % c, "%04X" % i] for c, i in name_aliases],
-                    "chars": NAME_DEFAULT_CHARS,
+                    "chars": name_default_chars(),
                 },
             }
     finally:

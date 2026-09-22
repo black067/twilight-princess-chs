@@ -1,8 +1,9 @@
-"""texts.csv 的读写：一行 = BMG 里的一格文本。
+"""texts<lang>.csv 的读写：一行 = BMG 里的一格文本。
 
-本模块只认 `key` 与两个文本列：译文列 `zh-Hans`、原文列 `cn`。其余列不参与打包。
+本模块只认 `key` 与两个文本列：译文列（lang 段的 `locale_col`，打包只读它）、
+底稿列（`draft_col`）。其余列不参与打包。
 
-    key,zh-Hans
+    key,译文
     zel_00/1,译文
     zel_unit/0/one,支箭
 
@@ -25,12 +26,20 @@ import re
 
 import paths
 
-FILE = os.path.join(paths.CN, "texts.csv")
 COL_KEY = "key"
-COL_LOCALE = "zh-Hans"     # 译文列
-COL_SOURCE = "cn"          # 原文列
-
 TAG_RE = re.compile(r"<T([0-9a-f]{6})(?::([0-9a-f]*))?>")
+
+
+def file():
+    return paths.texts_file()
+
+
+def col_locale():
+    return paths.locale_col()
+
+
+def col_draft():
+    return paths.draft_col()
 
 
 def format_tokens(tokens):
@@ -89,8 +98,10 @@ def parse_literal(literal):
     return out
 
 
-def read(path=FILE, locale=COL_LOCALE):
+def read(path=None, locale=None):
     """读 CSV -> {key: 字面串}。表头缺列、key 重复、行与表头列数不符都直接报错。"""
+    path = path or file()
+    locale = locale or col_locale()
     if not os.path.exists(path):
         raise SystemExit("缺 %s（用 export_texts.py 从素材导出）" % path)
     with open(path, "r", encoding="utf-8-sig", newline="") as f:

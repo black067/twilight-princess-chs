@@ -56,6 +56,7 @@ def load(path):
 
 
 def save(path, mapping, note):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     doc = {"note": note, "chars": {ch: "%04X" % code for ch, code in sorted(
         mapping.items(), key=lambda kv: kv[1])}}
     with open(path, "w", encoding="utf-8") as f:

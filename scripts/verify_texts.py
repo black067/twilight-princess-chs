@@ -1,8 +1,9 @@
 """对照校验：把变体自己那份部件按引擎口径解回字面串，与 cn/texts.csv 逐格比。
 
-跑哪个变体由 --variant 定（不给时 open）：open 的部件在 `work/sjis_parts`、比译文列 `zh-Hans`
-（码位表 `work/code_map.json`）；origin 的部件在 `work/sjis_parts.origin`、比原文列 `cn`
-（码位沿用原版字库的 Unicode 码位，搬过的查 `work/sjis_map.json` 的 remap）。
+跑哪个变体由 --variant 定（不给时 open）：open 的部件在 `work/<lang>/sjis_parts`、比译文列；
+origin 的部件在 `work/<lang>/sjis_parts.origin`、比底稿列。
+码位空间由 --code-space 定（不给时 own）：own 查 `work/code_map.json`，
+sjis 查 `work/sjis_map.json` 的 remap。
 
 引擎路径：非前导字节吃 1 字节、前导字节（0x81–0x9F / 0xE0–0xFC）吃 2 字节、
 `0x1A` 后跟 1 字节长度是标签。打包时有两处有意改写，比较前统一：
@@ -17,7 +18,6 @@ import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 
 import codes
@@ -30,7 +30,7 @@ import texts
 import yaz0
 
 NAME_BASE = PSF.NAME_DEFAULT_BASE
-NAME_CHARS = PSF.NAME_DEFAULT_CHARS
+NAME_CHARS = PSF.name_default_chars()
 
 
 def is_lead(b):
@@ -66,10 +66,11 @@ def message_cells(blob, spec, resource, rev):
     inf, dat = secs[b"INF1"], secs[b"DAT1"]
     n, esize = struct.unpack_from(">HH", blob, inf[0] + 8)
     dat_abs, dat_end = dat[0] + 8, dat[0] + dat[1]
+    keys = TR.message_keys(resource, spec["mid1"])
     out = {}
     for k in range(n):
         off = struct.unpack_from(">I", blob, inf[0] + 0x10 + k * esize)[0]
-        out["%s/%d" % (resource, spec["mid1"][k])] = engine_tokens(blob, dat_abs + off, dat_end, rev)
+        out[keys[k]] = engine_tokens(blob, dat_abs + off, dat_end, rev)
     return out
 
 
@@ -101,12 +102,11 @@ def normalize(tokens):
     return out
 
 
-def reverse_map(variant):
-    """码位 -> 字面字符：open 用自分配码位表；origin 的码位就是 Unicode 码位，只查搬过的那批。"""
-    if variant == paths.OPEN_VARIANT:
-        return {code: ch for ch, code
-                in codes.load(os.path.join(ROOT, "work", "code_map.json")).items()}
-    with open(os.path.join(ROOT, "work", "sjis_map.json"), encoding="utf-8") as f:
+def reverse_map(space):
+    """码位 -> 字面字符：own 查自分配码位表；sjis 只查搬过的那批。"""
+    if space == paths.DEFAULT_CODE_SPACE:
+        return {code: ch for ch, code in codes.load(paths.code_map_json()).items()}
+    with open(paths.sjis_map_json(), encoding="utf-8") as f:
         remap = json.load(f)["remap"]
     return {int(new, 16): chr(int(old, 16)) for old, new in remap.items()}
 
@@ -116,11 +116,13 @@ def main():
     if variant not in paths.PARTS_DIR:
         sys.exit("--variant 只支持 %s" % " / ".join(paths.PARTS_DIR))
     index, shapes = TR.load()
-    want = texts.read(texts.FILE, texts.COL_LOCALE if variant == paths.OPEN_VARIANT
-                      else texts.COL_SOURCE)
-    rev = reverse_map(variant)
+    # origin 的码位恒为 sjis 空间
+    space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
+    want = texts.read(texts.file(), texts.col_locale() if variant == paths.OPEN_VARIANT
+                      else texts.col_draft())
+    rev = reverse_map(space)
     parts = paths.parts_dir(variant)
-    print("变体 %s：部件 %s，对照 %s" % (variant, parts, texts.FILE))
+    print("变体 %s（%s 码位空间）：部件 %s，对照 %s" % (variant, space, parts, texts.file()))
 
     bad = []
     total = 0

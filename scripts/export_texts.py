@@ -1,9 +1,9 @@
-"""从 cn/msg/ 的归档导出 cn/texts.csv（一行 = BMG 里的一格文本）。
+"""从 lang 段的 source 目录导出 cn/texts.<lang>.csv（一行 = BMG 里的一格文本）。
 
-输入：cn/msg/*.arc.yaz0、data/msg_index.json、data/text_resources.json
-输出：cn/texts.csv，列为 key,cn,zh-Hans,comment
+输入：source 目录下的 *.arc.yaz0、data/msg_index.<lang>.json、data/text_resources.json
+输出：cn/texts.<lang>.csv，列为 key,<draft_col>,<locale_col>,comment
 
-  cn       导出的底稿快照，只读（打包取 zh-Hans）
+  底稿列   导出的原文快照，重新导出会被覆盖（打包读的是译文列）
   comment  写备注的列
 
 形状（data/text_resources.json）：
@@ -20,32 +20,20 @@ sys.path.insert(0, HERE)
 
 import material
 import patch_sjis_text as PST
+import paths
 import text_resources as TR
 import texts
 
-COL_DRAFT = "cn"
 COL_COMMENT = "comment"
-HEADER = (texts.COL_KEY, COL_DRAFT, texts.COL_LOCALE, COL_COMMENT)
-
-
-def pool_codes(pool, at):
-    """STR1 里的一个 2 字节串 -> 码位列表（码位 2 字节、`0000` 收尾）。"""
-    codes = []
-    i = at
-    while i + 1 < len(pool):
-        cu = (pool[i] << 8) | pool[i + 1]
-        if cu == 0:
-            break
-        codes.append(cu)
-        i += 2
-    return codes
 
 
 def file_cells(blob, resource, shape, spec):
     """{key: token 列表}：按形状读出这个文件里每一格的文本。"""
+    encoding = PST.encoding_of(blob)
     if shape["shape"] == "messages":
+        keys = TR.message_keys(resource, spec["mid1"])
         by_slot, pairs = PST.message_slots(blob)
-        return {"%s/%d" % (resource, spec["mid1"][k]): by_slot[off] for k, off in pairs}
+        return {keys[k]: by_slot[off] for k, off in pairs}
 
     secs = dict((t, (o, s)) for t, o, s in PST.sections(blob))
     inf, str1 = secs.get(b"INF1"), secs.get(b"STR1")
@@ -58,7 +46,7 @@ def file_cells(blob, resource, shape, spec):
         fields = struct.unpack_from(">" + "H" * (esize // 2), blob, inf[0] + 0x10 + k * esize)
         for name, field in shape["cells"].items():
             key = "%s/%d/%s" % (resource, k, name)
-            out[key] = [("chr", c) for c in pool_codes(pool, fields[field])]
+            out[key] = PST.pool_tokens(pool, fields[field], encoding)
     return out
 
 
@@ -85,8 +73,9 @@ def main():
         literal = literals[key]
         rows.append([key, literal, literal, ""])
 
-    texts.write(texts.FILE, HEADER, rows)
-    print("导出 %d 行 -> %s" % (len(rows), texts.FILE))
+    path = texts.file()
+    texts.write(path, (texts.COL_KEY, texts.col_draft(), texts.col_locale(), COL_COMMENT), rows)
+    print("导出 %d 行（%s）-> %s" % (len(rows), paths.lang(), path))
     print("  资源 %d 个：%s" % (len(shapes), " ".join(sorted(shapes))))
 
 

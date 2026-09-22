@@ -34,9 +34,9 @@ import patch_sjis_font as PSF
 import rarc
 import yaz0
 
-CODEMAP = os.path.join(paths.WORK, "code_map.json")
-OUT_DIR = os.path.join(paths.WORK, "scratch_parts")
-KB_JSON = os.path.join(paths.WORK, "keyboard_aliases.json")
+CODEMAP = paths.code_map_json()
+OUT_DIR = paths.scratch_dir(paths.DEFAULT_CODE_SPACE)
+KB_JSON = paths.kb_json(paths.DEFAULT_CODE_SPACE)
 
 CELL = 48                      # 字形格边长（与原字库一致；引擎按格取纹理 UV）
 ROWS = 64                      # 图集横向格数：纹理宽 = ROWS*CELL，高 = 列数*CELL
@@ -87,7 +87,7 @@ def code_chars():
         fixed[code] = sjis_char(code)
     for code in PSF.PAL_KEY_CODES:
         fixed[code] = PSF.PAL_KEY_CHAR.get(code, chr(code))
-    for i, ch in enumerate(PSF.NAME_DEFAULT_CHARS):
+    for i, ch in enumerate(PSF.name_default_chars()):
         fixed[PSF.NAME_DEFAULT_BASE + i] = ch
     clash = {c: (pairs[c], fixed[c]) for c in pairs.keys() & fixed.keys() if pairs[c] != fixed[c]}
     assert not clash, "码位冲突（译文码位被引擎固定码位占用）：%s" % clash
@@ -309,7 +309,7 @@ def main():
         ttf, em, gamma = PSF.font_settings(part, CLI_TTF, CLI_EM)
         if not ttf or not os.path.exists(ttf):
             sys.exit("缺字体文件：config 的 fonts.%s.file（或 --ttf <路径>）" % part)
-        cfg = (paths.config_value("fonts") or {}).get(part) or {}
+        cfg = (paths.lang_value("fonts") or {}).get(part) or {}
         ascent, descent, width, leading = DEFAULT_METRICS[part]
         ascent = int(cfg.get("ascent") or ascent)
         descent = int(cfg.get("descent") or descent)
@@ -361,8 +361,8 @@ def main():
                 "name_default": {
                     "aliases": [["%04X" % (PSF.NAME_DEFAULT_BASE + i),
                                  "%04X" % slots[PSF.NAME_DEFAULT_BASE + i]]
-                                for i in range(len(PSF.NAME_DEFAULT_CHARS))],
-                    "chars": PSF.NAME_DEFAULT_CHARS,
+                                for i in range(len(PSF.name_default_chars()))],
+                    "chars": PSF.name_default_chars(),
                 },
             }
     with open(KB_JSON, "w", encoding="utf-8") as f:

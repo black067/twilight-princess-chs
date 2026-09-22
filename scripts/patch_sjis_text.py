@@ -11,9 +11,10 @@ sys.path.insert(0, SCRIPTS)
 import paths
 import yaz0
 import material
-from patch_sjis_font import NAME_DEFAULT_BASE, NAME_DEFAULT_CHARS
+import patch_sjis_font as PSF
+import text_resources as TR
 
-MAP_JSON = os.path.join(paths.WORK, "sjis_map.json")
+MAP_JSON = paths.sjis_map_json()
 OUT_DIR = paths.parts_dir(paths.ORIGIN_VARIANT)   # 就地改写只出 origin 变体，文本部件落在它自己的目录
 
 SHIFT_JIS_ENCODING = 3
@@ -27,14 +28,6 @@ NEWLINE = 0x0A
 # 该 tag 只表示一个装饰性的 ※，直接换成字面 ※（U+203B）最稳。
 REFMARK_TAG = 0x060005
 REFMARK_CHAR = 0x203B
-
-# 默认名改写表（id → 文本）。实机标定：897 = 主角默认名、898 = 马匹默认名；
-# 899/900 是两屏标题，文本本来就对，不必改写。
-# 表里的字写成 NAME_DEFAULT_CHARS 的单字节码位（码位表与理由在 patch_sjis_font.py）。
-NAME_MSG_OVERRIDES = {
-    897: "林克",
-    898: "伊波娜",
-}
 
 
 def sections(blob):
@@ -52,26 +45,65 @@ def sections(blob):
     return out
 
 
-def decode(blob, start, limit):
-    """2 字节视角切 token。tag 几何实测：下一元素 = marker + size（size 含 2 字节 marker），
-    payload = size - 6。"""
+def decode(blob, start, limit, encoding=2):
+    """按源素材的 encoding 切 token。tag 几何实测：当前字符宽度的 marker `0x1A` + 1 字节 size
+    + 3 字节 tag id + payload，步进 = size（payload = size - 4 - marker 宽度）。
+    """
     out = []
     i = start
-    while i + 1 < limit:
-        cu = (blob[i] << 8) | blob[i + 1]
-        if cu == 0:
+    while i < limit:
+        code, width = read_char(blob, i, limit, encoding)
+        if code is None:
             break
-        if cu == 0x001A:
-            if i + 3 > limit:
+        if code == 0:
+            break
+        if code == TAG:
+            size = blob[i + width]
+            if size < 4 + width or i + size > limit:
                 break
-            u_size = blob[i + 2]
-            if u_size < 6 or i + u_size > limit:
-                break
-            out.append(("tag", bytes(blob[i + 3 : i + 6]), bytes(blob[i + 6 : i + u_size])))
-            i += u_size
+            out.append(("tag", bytes(blob[i + width + 1 : i + width + 4]),
+                        bytes(blob[i + width + 4 : i + size])))
+            i += size
             continue
-        out.append(("chr", cu))
-        i += 2
+        out.append(("chr", code))
+        i += width
+    return out
+
+
+def encoding_of(blob):
+    """BMG 头里的 encoding（1 = 每字节一个字符，2 = 2 字节码位，3 = ShiftJIS）。"""
+    return blob[blob.find(b"MESG") + 0x10]
+
+
+def is_lead(byte):
+    return 0x81 <= byte <= 0x9F or 0xE0 <= byte <= 0xFC
+
+
+def read_char(blob, i, limit, encoding):
+    """(码位, 宽度)：按源编码取一个字符；越界返回 (None, 0)。"""
+    if encoding == 2:
+        if i + 1 >= limit:
+            return None, 0
+        return (blob[i] << 8) | blob[i + 1], 2
+    if encoding == 1:
+        return blob[i], 1
+    if is_lead(blob[i]):
+        if i + 1 >= limit:
+            return None, 0
+        return ord(blob[i : i + 2].decode("shift_jis")), 2
+    return ord(blob[i : i + 1].decode("shift_jis")), 1
+
+
+def pool_tokens(pool, at, encoding):
+    """STR1 池里的一个串 -> token 列表（读到 0 结束，编码与它所在 BMG 相同）。"""
+    out = []
+    i = at
+    while i < len(pool):
+        code, width = read_char(pool, i, len(pool), encoding)
+        if code is None or code == 0:
+            break
+        out.append(("chr", code))
+        i += width
     return out
 
 
@@ -111,6 +143,8 @@ def message_slots(blob):
 
     原归档允许两条消息共用一段文本（后缀共享），所以按不同偏移切、按槽去重。
     """
+    encoding = encoding_of(blob)
+    width = 2 if encoding == 2 else 1
     off = blob.find(b"MESG")
     size = struct.unpack_from(">I", blob, off + 8)[0]
     inner = blob[off : off + size]
@@ -127,16 +161,34 @@ def message_slots(blob):
     texts = {}
     for s in starts:
         limit = dat_abs + nxt[s]
-        texts[s] = decode(blob, dat_abs + s, limit - 2) if limit - (dat_abs + s) >= 2 else []
+        texts[s] = (decode(blob, dat_abs + s, limit - width, encoding)
+                    if limit - (dat_abs + s) >= width else [])
     return texts, [(k, o) for k, o in enumerate(offsets)]
 
 
 def default_name_bytes(text):
-    """默认名文本 → 单字节码位序列（配合字库里 NAME_DEFAULT_CHARS 的别名）。"""
-    return bytes(NAME_DEFAULT_BASE + NAME_DEFAULT_CHARS.index(ch) for ch in text)
+    """默认名文本 → 单字节码位序列（配合字库里 default_name_chars 的别名）。"""
+    chars = PSF.name_default_chars()
+    missing = [ch for ch in text if ch not in chars]
+    if missing:
+        sys.exit("默认名 %r 里有 lang 段 default_name_chars 没收的字：%s" % (text, missing))
+    return bytes(PSF.NAME_DEFAULT_BASE + chars.index(ch) for ch in text)
 
 
-def patch_mesg(blob, remap, defaults=None):
+def name_cells(inner, resource):
+    """{条目下标: 格子键}：配置里要按单字节码位写的格子（按消息号表对号）。"""
+    wanted = set(PSF.default_name_cells())
+    if not wanted:
+        return {}
+    mid = next((s for s in sections(inner) if s[0] == b"MID1"), None)
+    if not mid:
+        return {}
+    count = struct.unpack_from(">H", inner, mid[1] + 8)[0]
+    ids = list(struct.unpack_from(">%dI" % count, inner, mid[1] + 0x10))
+    return {k: key for k, key in enumerate(TR.message_keys(resource, ids)) if key in wanted}
+
+
+def patch_mesg(blob, remap, resource=""):
     off = blob.find(b"MESG")
     size = struct.unpack_from(">I", blob, off + 8)[0]
     inner = blob[off : off + size]
@@ -147,19 +199,31 @@ def patch_mesg(blob, remap, defaults=None):
     dat_abs = off + dat[1] + 8
     dat_end = off + dat[1] + dat[2]
 
+    encoding = encoding_of(blob)
+    width = 2 if encoding == 2 else 1
     blob[off + 0x10] = SHIFT_JIS_ENCODING
 
     offsets = sorted({struct.unpack_from(">I", inner, inf[1] + 0x10 + k * esize)[0]
                       for k in range(nent)})
     bounds = offsets[1:] + [dat_end - dat_abs]
 
+    targets = name_cells(inner, resource)
+    # 文本必须在改写前从源字节解出：改写把码位换成了目标编码，再解就是乱码
+    wanted = {}
+    for idx, key in sorted(targets.items()):
+        off_k = struct.unpack_from(">I", inner, inf[1] + 0x10 + idx * esize)[0]
+        limit = dat_abs + bounds[offsets.index(off_k)]
+        start = dat_abs + off_k
+        wanted[idx] = "".join(chr(t[1]) for t in decode(blob, start, limit - width, encoding)
+                              if t[0] == "chr")
+
     shrunk = exact = 0
     for old, bound in zip(offsets, bounds):
         start = dat_abs + old
         limit = dat_abs + bound
-        if limit - start < 2:
+        if limit - start < width:
             continue
-        enc = encode(decode(blob, start, limit - 2), remap)
+        enc = encode(decode(blob, start, limit - width, encoding), remap)
         assert len(enc) <= limit - start, "message does not fit its slot (off=%d)" % old
         if len(enc) < limit - start:
             shrunk += 1
@@ -169,23 +233,19 @@ def patch_mesg(blob, remap, defaults=None):
         for i in range(start + len(enc), limit):
             blob[i] = 0
 
-    for msg_id, text in sorted((defaults or {}).items()):
-        if msg_id >= nent:
-            continue
-        off_k = struct.unpack_from(">I", inner, inf[1] + 0x10 + msg_id * esize)[0]
+    for idx, key in sorted(targets.items()):
+        off_k = struct.unpack_from(">I", inner, inf[1] + 0x10 + idx * esize)[0]
         j = offsets.index(off_k)
         start = dat_abs + off_k
         limit = dat_abs + bounds[j]
-        if isinstance(text, bytes):
-            enc = text          # 已是目标编码的原始字节（默认名的单字节码位）
-        else:
-            enc = encode([("chr", ord(c)) for c in text], remap)
+        text = wanted[idx]
+        enc = default_name_bytes(text)
         assert len(enc) <= limit - start, "消息 %d 放不下：%r 需 %d 字节，槽位 %d" % (
-            msg_id, text, len(enc), limit - start)
+            idx, text, len(enc), limit - start)
         blob[start : start + len(enc)] = enc
         for i in range(start + len(enc), limit):
             blob[i] = 0
-        print("     改写 msg %d = %r（用 %d/%d 字节）" % (msg_id, text, len(enc), limit - start))
+        print("     改写 %s = %r（用 %d/%d 字节）" % (key, text, len(enc), limit - start))
 
     return nent, len(offsets), shrunk, exact
 
@@ -194,8 +254,6 @@ def main():
     with open(MAP_JSON, encoding="utf-8") as f:
         doc = json.load(f)
     remap = {int(k, 16): int(v, 16) for k, v in doc["remap"].items()}
-    # 默认名的单字节别名两个变体都有（见 patch_sjis_font.py 的 name_default_aliases）
-    overrides = {k: default_name_bytes(v) for k, v in NAME_MSG_OVERRIDES.items()}
 
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -208,8 +266,9 @@ def main():
                 f.write(yaz0.encode(bytes(blob)))
             print("  %-14s copied as-is" % tail)
             continue
-        nent, msgs, shrunk, exact = patch_mesg(
-            blob, remap, overrides if tail == "bmgres.arc" else None)
+        inner_name = next(name for name in material.rarc_files(arc) if b"MESG" in material.rarc_files(arc)[name])
+        resource = os.path.splitext(inner_name)[0]
+        nent, msgs, shrunk, exact = patch_mesg(blob, remap, resource)
         with open(path, "wb") as f:
             f.write(yaz0.encode(bytes(blob)))
         print("  %-14s entries=%-5d msgs=%-5d shrunk=%-5d exact=%-5d size %d"
