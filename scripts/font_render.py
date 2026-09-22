@@ -661,7 +661,7 @@ def main():
         sys.exit("需要 --ttf <字体文件>（或 config 的 fonts.<字库>.file）")
     arc_path = os.path.join(paths.font_source_dir(), "%s.arc.yaz0" % font_name)
     if not os.path.exists(arc_path):
-        sys.exit("缺少 %s：把字库归档导出到参照字库目录（见 docs/管线复现.md）" % arc_path)
+        sys.exit("缺少 %s：字库归档要放在参照字库目录里（见 docs/管线复现.md）" % arc_path)
 
     t0 = time.time()
     with open(arc_path, "rb") as f:

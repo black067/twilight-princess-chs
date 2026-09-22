@@ -22,7 +22,7 @@ SUFFIX = ".yaz0"
 def _load(dirpath, what):
     """[(部件名, 解 Yaz0 后的字节)]：目录下所有 <部件名>%s，按名字排序。""" % SUFFIX
     if not os.path.isdir(dirpath):
-        sys.exit("缺 %s（%s）：把素材导出到这里" % (dirpath, what))
+        sys.exit("缺 %s（%s）：把素材放到这里" % (dirpath, what))
     out = []
     for name in sorted(os.listdir(dirpath)):
         if not name.endswith(SUFFIX):
