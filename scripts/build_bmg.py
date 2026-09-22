@@ -3,7 +3,7 @@
 输入
   data/msg_index.<lang>.json 容器索引（BMG 名、条数、entrySize、MID1、条目属性、尾部块）
   data/text_resources.json   文本资源形状（哪些资源、每格叫什么）
-  cn/texts.csv               译文（`key` + `zh-Hans`）
+  <input_dir>/texts.<lang>.csv  译文（`key` + 译文列）
   原样带过的块               FLW1/FLI1 流脚本（无正文文本）
 
 输出
@@ -230,7 +230,7 @@ def main():
     sources = dict(material.msg_arcs())
     for base in index:
         if base not in sources:
-            sys.exit("cn/msg/ 里缺 %s" % base)
+            sys.exit("%s 里缺 %s" % (paths.source_dir(), base))
     blobs = {}
     for base, arc in sources.items():
         for name, data in material.rarc_files(arc).items():

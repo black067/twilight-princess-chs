@@ -646,7 +646,7 @@ def _repacked(arc):
 
 def main():
     font_name = _arg("--font", "fontres")
-    ttf = _arg("--ttf") or paths.option("--cn-font")
+    ttf = _arg("--ttf")
     em = float(_arg("--em", DEFAULT_EM))
     gamma = float(_arg("--gamma", DEFAULT_GAMMA))
     place = _arg("--place", "inherit")
@@ -658,10 +658,10 @@ def main():
     orig_png = _arg("--orig-png", os.path.join(outdir, "orig_%s.png" % font_name))
 
     if not ttf:
-        sys.exit("需要 --ttf <字体文件>（或 config.json 的 cn_font 字段）")
-    arc_path = os.path.join(ROOT, "cn", "font", "%s.arc.yaz0" % font_name)
+        sys.exit("需要 --ttf <字体文件>（或 config 的 fonts.<字库>.file）")
+    arc_path = os.path.join(paths.font_source_dir(), "%s.arc.yaz0" % font_name)
     if not os.path.exists(arc_path):
-        sys.exit("缺少 %s：把字库归档导出到 cn/font/（见 docs/管线复现.md）" % arc_path)
+        sys.exit("缺少 %s：把字库归档导出到参照字库目录（见 docs/管线复现.md）" % arc_path)
 
     t0 = time.time()
     with open(arc_path, "rb") as f:

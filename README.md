@@ -3,7 +3,7 @@
 塞尔达传说：黄昏公主的汉化 mod，用于 [dusklight](https://github.com/TwilitRealm/dusklight)
 
 > **本仓库只有脚本与文档**
-> 输入素材（`cn/`）与产物（`dist/`、`work/`）请通过合法途径自行获取；输入格式见 [docs/管线复现.md](docs/管线复现.md)
+> 输入素材（`input/`）与产物（`dist/`、`work/`）请通过合法途径自行获取；输入格式见 [docs/管线复现.md](docs/管线复现.md)
 
 **现状**：中文文本与中文字库已全部就位，全部游戏内文本的中文已在 dusklight 上跑通——
 标题提示、存档界面、对话、菜单、栏位文字、电视设置页面都正常，主角名与马名正常，中文名字键盘可用。
@@ -18,7 +18,7 @@
 | `data/` | 名字键盘字表、每语言的容器索引 `msg_index.<lang>.json`、文本资源形状表（`text_resources.json`） |
 | `docs/` | 文档：技术备忘 / 管线复现 / 发布指南（见下方「文档」） |
 | `tools/` | 配套工具：`dusklight-download/` 拉 dusklight / dusk-cn 的 release、启盘镜像 |
-| `cn/` | 素材输入（自备）：`msg/` `msg_us/` 是管线要读的原始归档，`texts.<lang>.csv` 是译文表，`text/` 供人读 |
+| `input/` | 素材输入（自备）：消息库、参照字库、译文表；根目录由 config 的 `input_dir` 定 |
 | `assets/` | 上架素材：`icon.png`（299×299）、`banner.png`（1600×457）、`preview-*.png`；lang 段的 `mod.icon` / `mod.banner` 指向它们 |
 | `dist/` | 打出来的 `.dusk` 成品包 |
 | `work/` | 中间数据，**按语言分目录**（`work/<lang>/`）：`scratch_parts*/`、`sjis_parts*/` 部件与码位表；`work/fonts/` 是开源字体与标定对照图 |
@@ -26,14 +26,13 @@
 ## 快速开始
 
 ```pwsh
-# 0) 输入：开源字体与 cn/ 素材
-#    work/fonts/NotoSansCJKsc-Regular.otf  思源黑体 / Noto Sans CJK SC（OFL-1.1）
-#    work/fonts/LXGWWenKai-Regular.ttf     霞鹜文楷（OFL-1.1）
-#    cn/font/fontres.arc.yaz0  cn/font/rubyres.arc.yaz0  cn/msg/bmgres*.arc.yaz0
+# 0) 输入（放哪由 config 定）：
+#    开源字体：思源黑体 / Noto Sans CJK SC、霞鹜文楷（均 OFL-1.1）→ fonts.<字库>.file
+#    游戏素材：两套字库归档 → font_source；各语言的 10 个消息库 → langs.<lang>.source
 
-# 1) 索引与译文表（一次；之后改译文只动 cn/texts.zh-Hans.csv 的译文列）
+# 1) 索引与译文表（一次；之后改译文只动 input/texts.zh-Hans.csv 的译文列）
 python scripts/msg_index.py                # 源归档 -> data/msg_index.zh-Hans.json
-python scripts/export_texts.py             # 源归档 -> cn/texts.zh-Hans.csv
+python scripts/export_texts.py             # 源归档 -> input/texts.zh-Hans.csv
 
 # 2) 打包（容器与字库都从零生成；另一条就地改写路线见 docs/管线复现.md）
 python scripts/build_bmg.py                # 消息容器（读译文表，顺带写 work/zh-Hans/code_map.json）
@@ -52,7 +51,8 @@ python scripts/install.py --region us      # --list 只看现状
 元信息 `mod`/`mod_origin`）；上面这些命令都可用 `--lang <语言>` 换段（缺省 `default_lang`），
 中间产物按语言分目录。已有的段见 `scripts/config.example.json` 的 `langs`。
 
-路径 / 地区 / 字体 / 元信息都在 `scripts/config.example.json`：`discs` 一个盘一项（`region` = 字库目录
+路径 / 地区 / 字体 / 元信息都在 `scripts/config.example.json`：`input_dir` 指本地素材根（缺省 `input/`，
+`font_source` 与各语言 `source` 的默认位置都从它派生），`discs` 一个盘一项（`region` = 字库目录
 `Font<region>`，`language` = 消息目录 `Msg<language>`），默认美版 `us`/`us`、欧版 `eu`/`fr`、日版 `jp`/`jp`；
 `scripts/config.json` 只写本机路径差异，两者递归合并、命令行 `--xxx` 再覆盖。
 

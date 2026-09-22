@@ -1,4 +1,4 @@
-"""对照校验：把变体自己那份部件按引擎口径解回字面串，与 cn/texts.csv 逐格比。
+"""对照校验：把变体自己那份部件按引擎口径解回字面串，与译文表逐格比。
 
 跑哪个变体由 --variant 定（不给时 open）：open 的部件在 `work/<lang>/sjis_parts`、比译文列；
 origin 的部件在 `work/<lang>/sjis_parts.origin`、比底稿列。

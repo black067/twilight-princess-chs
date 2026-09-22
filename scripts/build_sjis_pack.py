@@ -146,6 +146,22 @@ def overlay_entries(variant, region, language):
             + [("overlay/res/%s/%s" % (paths.msg_dir(language), n), p) for n, p in texts])
 
 
+# zip 成员时间戳固定：同一份输入必须打出同一个包字节，否则打包时间进了产物、文件 sha256 无法当回归判据
+STAMP = (1980, 1, 1, 0, 0, 0)
+
+
+def add_bytes(z, arcname, data):
+    info = zipfile.ZipInfo(arcname, STAMP)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = 0o644 << 16
+    z.writestr(info, data)
+
+
+def add_file(z, path, arcname):
+    with open(path, "rb") as f:
+        add_bytes(z, arcname, f.read())
+
+
 def build(variant, meta, region, language, out_dir, check_only=False):
     """打一个变体在一个地区的包。"""
     meta = select_fields(meta, variant)
@@ -164,9 +180,9 @@ def build(variant, meta, region, language, out_dir, check_only=False):
     out = os.path.join(out_dir, paths.escape_mod_id(meta["id"]) + ".dusk")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         # 字节格式：2 空格缩进、键序 id→…→banner、末尾不留换行、UTF-8 无 BOM
-        z.writestr("mod.json", json.dumps(meta, indent=2, ensure_ascii=False))
+        add_bytes(z, "mod.json", json.dumps(meta, indent=2, ensure_ascii=False).encode("utf-8"))
         for arcname, path in entries:
-            z.write(path, arcname)
+            add_file(z, path, arcname)
     print("built %s  %d bytes  id=%s  字库部件来自 %s"
           % (out, os.path.getsize(out), meta["id"], paths.PARTS_DIR[variant]))
     for arcname, _ in entries:

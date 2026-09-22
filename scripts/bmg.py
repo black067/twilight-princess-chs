@@ -33,7 +33,7 @@ def decode_attempts(raw):
 
 
 def main():
-    pat = sys.argv[1] if len(sys.argv) > 1 else "work/cn/bmgres.arc"
+    pat = sys.argv[1] if len(sys.argv) > 1 else "input/msg/bmgres.arc"
     nmax = int(sys.argv[2]) if len(sys.argv) > 2 else 8
     for p in sorted(glob.glob(pat)):
         data = open(p, "rb").read()

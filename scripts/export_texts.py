@@ -1,7 +1,7 @@
-"""从 lang 段的 source 目录导出 cn/texts.<lang>.csv（一行 = BMG 里的一格文本）。
+"""从 lang 段的 source 目录导出译文表 <input_dir>/texts.<lang>.csv（一行 = BMG 里的一格文本）。
 
 输入：source 目录下的 *.arc.yaz0、data/msg_index.<lang>.json、data/text_resources.json
-输出：cn/texts.<lang>.csv，列为 key,<draft_col>,<locale_col>,comment
+输出：<input_dir>/texts.<lang>.csv，列为 key,<draft_col>,<locale_col>,comment
 
   底稿列   导出的原文快照，重新导出会被覆盖（打包读的是译文列）
   comment  写备注的列

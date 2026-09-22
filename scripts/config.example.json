@@ -5,11 +5,12 @@
     "mods_dir": "<游戏的 mod 目录（放 .dusk）：dusklight 2.x 是 exe 同级的 mods/，dusk-cn 是 <游戏目录>/data/mods/>",
     "game_config": "<游戏配置 json：dusklight 2.x 是数据目录下的 config.json，dusk-cn 是 <游戏目录>/data/config.json>",
 
+    "input_dir": "input",
     "default_lang": "zh-Hans",
-    "font_source": "cn/font",
+    "font_source": "input/font",
     "langs": {
         "zh-Hans": {
-            "source": "cn/msg",
+            "source": "input/msg",
             "draft_col": "cn",
             "locale_col": "zh-Hans",
             "default_name_chars": "林克伊波娜",
@@ -39,7 +40,7 @@
             }
         },
         "en": {
-            "source": "cn/msg_us",
+            "source": "input/msg_us",
             "draft_col": "en",
             "locale_col": "en",
             "discs": [

@@ -3,6 +3,7 @@
 config.example.json 是完整默认值（路径字段写 <占位符>）；config.json 只写本机差异；
 --xxx 命令行再覆盖。两者递归合并。langs 段由 --lang 选用（缺省 default_lang）：
 source / draft_col / locale_col / discs / mod / mod_origin，中间产物落在 work/<lang>/。
+本地素材根是顶层 input_dir（缺省 input/）：消息库、参照字库、译文表都在它下面。
 """
 
 import json
@@ -13,7 +14,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 WORK = os.path.join(ROOT, "work")
 DATA = os.path.join(ROOT, "data")
-CN = os.path.join(ROOT, "cn")
 CONFIG = os.path.join(HERE, "config.json")
 CONFIG_EXAMPLE = os.path.join(HERE, "config.example.json")
 
@@ -76,15 +76,16 @@ def msg_index_json():
 
 
 def font_source_dir():
-    """参照字库目录（lang 段 font_source，缺省 cn/font）。"""
-    value = lang_value("font_source") or "cn/font"
+    """参照字库目录（lang 段 font_source，缺省 <input_dir>/font）。"""
+    value = lang_value("font_source")
+    if not value:
+        return os.path.join(input_dir(), "font")
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
 # 命令行参数 -> 配置字段
 KEYS = {
     "--exe": "dusklight_exe",
-    "--cn-font": "cn_font",
     "--em": "em",
     "--mods-dir": "mods_dir",
     "--game-config": "game_config",
@@ -212,9 +213,15 @@ def source_dir():
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
+def input_dir():
+    """本地素材根（顶层 input_dir，缺省 input）：消息库、参照字库、译文表都在它下面。"""
+    value = config_value("input_dir") or "input"
+    return value if os.path.isabs(value) else os.path.join(ROOT, value)
+
+
 def texts_file():
-    """译文表：cn/texts.<lang>.csv（与素材放在一起）。"""
-    return os.path.join(CN, "texts.%s.csv" % lang())
+    """译文表：<input_dir>/texts.<lang>.csv（与素材放在一起）。"""
+    return os.path.join(input_dir(), "texts.%s.csv" % lang())
 
 
 def _col(key):
