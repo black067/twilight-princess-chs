@@ -39,6 +39,27 @@
                 "banner": "assets/banner.png"
             }
         },
+        "cn": {
+            "source": "input/msg_us",
+            "draft_col": "en",
+            "locale_col": "cn",
+            "default_name_chars": "林克伊波娜",
+            "default_name_cells": [ "zel_00/898", "zel_00/899" ],
+            "discs": [
+                { "region": "us", "language": "us" },
+                { "region": "eu", "language": "fr" },
+                { "region": "jp", "language": "jp" }
+            ],
+            "mod": {
+                "id": "yiga.cn.{region}",
+                "name": "Chinese Translation (DeepSeek Ver)",
+                "version": "1.0.0",
+                "author": "Yiga Clan",
+                "description": "Chinese translation translated from English (US) text by an AI.",
+                "icon": "assets/icon.png",
+                "banner": "assets/banner.png"
+            }
+        },
         "en": {
             "source": "input/msg_us",
             "draft_col": "en",
