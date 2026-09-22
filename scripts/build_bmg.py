@@ -1,17 +1,6 @@
 """从零生成消息归档：RARC 与 BMG 全部自己写，只吃「索引表 + 形状表 + 译文」。
 
-输入
-  data/msg_index.<lang>.json 容器索引（BMG 名、条数、entrySize、MID1、条目属性、尾部块）
-  data/text_resources.json   文本资源形状（哪些资源、每格叫什么）
-  <input_dir>/texts.<lang>.csv  译文（`key` + 译文列）
-  原样带过的块               FLW1/FLI1 流脚本（无正文文本）
-
-输出
-  work/scratch_parts/bmgres*.arc   Yaz0 压的 RARC，可直接被 build_sjis_pack.py 打包
-  work/code_map.json               字符 -> 新码位（字库生成器读同一份）
-
-自己写的东西：MESG 头、INF1（每条 = 偏移 + message_id + 属性，见 docs「消息属性」）、
-DAT1（布局自定）、MID1（消息号列表）、STR1（短串表的字符串池）、RARC（含名字哈希）。
+同时写出容器与字库共用的码位表（`work/<lang>/code_map.json`）。
 """
 
 import json

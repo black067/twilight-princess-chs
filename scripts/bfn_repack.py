@@ -1,8 +1,6 @@
 """BFN(GLY1, GX I4) 重打包：把多页字形拼成单页大图集。
 
-平铺规则对齐 encounter/aurora lib/gfx/texture_convert.cpp:
-  DecodeTiled<TextureDecoderI4>：8x8 块按行主序，块内 8 行、每行 4 字节，
-  偶数 x 取高半字节、奇数 x 取低半字节。
+平铺是 8x8 块行主序、块内每行 4 字节，偶数 x 取高半字节、奇数 x 取低半字节；重排时必须保持这个顺序。
 """
 
 import struct

@@ -1,7 +1,4 @@
-"""文本资源的格：`<资源>/<单元>[/<格名>]` 的枚举与拆解。
-
-形状表在 data/text_resources.json，条数与消息号在当前语言的 data/msg_index.<lang>.json。
-"""
+"""文本资源的格：`<资源>/<单元>[/<格名>]` 的枚举与拆解。"""
 
 import json
 import os

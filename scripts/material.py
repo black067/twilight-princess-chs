@@ -1,12 +1,4 @@
-"""素材读取层（`<input_dir>/`，缺省 `input/`）。
-
-字库与消息归档由使用者自备（Yaz0 压缩的 RARC）。
-
-  <font_source>/fontres.arc.yaz0   rubyres.arc.yaz0     字库（RARC 内是 BFN）
-  <lang 的 source 目录>/bmgres.arc.yaz0 …                消息库（RARC 内是 BMG）
-
-文件名就是部件名加 .yaz0，部件名与打包时写进包内的一致（fontres.arc / bmgres.arc）。
-字库目录由 lang 段的 font_source 定（缺省 `<input_dir>/font`）；消息库取 lang 段的 source。
+"""素材读取层：读 `<input_dir>/` 下 Yaz0 压缩的 RARC（字库目录按 lang 段的 `font_source`，消息库按 `source`）。
 """
 
 import os

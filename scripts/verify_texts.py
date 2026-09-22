@@ -1,15 +1,6 @@
 """对照校验：把变体自己那份部件按引擎口径解回字面串，与译文表逐格比。
 
-跑哪个变体由 --variant 定（不给时 open）：open 的部件在 `work/<lang>/sjis_parts`、比译文列；
-origin 的部件在 `work/<lang>/sjis_parts.origin`、比底稿列。
-码位空间由 --code-space 定（不给时 own）：own 查 `work/code_map.json`，
-sjis 查 `work/sjis_map.json` 的 remap。
-
-引擎路径：非前导字节吃 1 字节、前导字节（0x81–0x9F / 0xE0–0xFC）吃 2 字节、
-`0x1A` 后跟 1 字节长度是标签。打包时有两处有意改写，比较前统一：
-
-  `<T060005>`（装饰性 ※ 标签） -> 字面 `※`
-  默认名的单字节码位（0xA1–0xA5） -> 表里对应的汉字
+比较前先折算打包时的两处有意改写：`<T060005>` → 字面 `※`，默认名单字节码位 `0xA1–0xA5` → 对应汉字。
 """
 
 import json

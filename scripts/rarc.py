@@ -1,17 +1,6 @@
 """RARC 归档写入：按 JKRArchive 的磁盘格式拼单节点归档。
 
-格式（`libs/JSystem/src/JKernel/JKRMemArchive.cpp` + `JKRArchive.h`）：
-- 头 0x20：`RARC` / 文件长度 / header_length(0x20) / file_data_offset / file_data_length / 三个未知字段
-- 信息块在 header_length（0x20）处：节点数 / 节点表偏移 / 文件数 / 文件表偏移 /
-  字符串表长度 / 字符串表偏移 / next_free_file_id(u16) / sync(u8)
-- 节点 0x10：type('ROOT') / 名字偏移 / 名字哈希(u16) / 条目数 / 首个条目下标
-- 文件项 0x14：file_id(u16) / 名字哈希(u16) / flags<<24 | 名字偏移 / data_offset / data_size / 4 字节 data 指针字段（主机端用，写 0）
-- 节点/文件/字符串表的偏移都相对**信息块起点**（= header_length）；
-  data_offset 相对 `header_length + file_data_offset`，每条数据按 0x20 对齐
-
-名字哈希（`JKRArchive::CArcName::store`）：`h = (tolower(ch) + h * 3) & 0xFFFF`，初值 0。
-引擎按名字取文件（`JKRGetTypeResource('ROOT', "zel_00.bmg", arc)`）时先比哈希再 strcmp，
-所以哈希必须算对。
+名字哈希必须与引擎算的一致（`h = (tolower(ch) + h * 3) & 0xFFFF`），否则按名取不到文件。
 """
 
 import struct

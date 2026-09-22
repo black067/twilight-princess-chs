@@ -1,9 +1,6 @@
 """外部路径与默认配置的统一入口。
 
-config.example.json 是完整默认值（路径字段写 <占位符>）；config.json 只写本机差异；
---xxx 命令行再覆盖。两者递归合并。langs 段由 --lang 选用（缺省 default_lang）：
-source / draft_col / locale_col / discs / mod / mod_origin，中间产物落在 work/<lang>/。
-本地素材根是顶层 input_dir（缺省 input/）：消息库、参照字库、译文表都在它下面。
+`config.example.json` 是完整默认值，`config.json` 只写本机差异，`--xxx` 命令行再覆盖。
 """
 
 import json

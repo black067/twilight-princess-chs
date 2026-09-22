@@ -28,7 +28,7 @@ README.md            本文件
 
 ## 下载
 
-脚本只在标准库内实现（`urllib` 下载、`json` 读配置），Windows / macOS / Linux 通用；用仓库根的 venv 时，Windows 是 `.venv\Scripts\python.exe`、Unix 是 `.venv/bin/python`。
+脚本只在标准库内实现（`urllib` 下载、`json` 读配置），Windows / macOS / Linux 通用，建议设置好 `.venv` 后使用。
 
 ```sh
 python scripts/fetch_release.py                     # 按配置

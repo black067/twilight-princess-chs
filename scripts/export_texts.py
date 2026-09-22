@@ -1,14 +1,6 @@
-"""从 lang 段的 source 目录导出译文表 <input_dir>/texts.<lang>.csv（一行 = BMG 里的一格文本）。
+"""从 lang 段的 source 目录导出译文表 <input_dir>/texts.<lang>.csv。
 
-输入：source 目录下的 *.arc.yaz0、data/msg_index.<lang>.json、data/text_resources.json
-输出：<input_dir>/texts.<lang>.csv，列为 key,<draft_col>,<locale_col>,comment
-
-  底稿列   导出的原文快照，重新导出会被覆盖（打包读的是译文列）
-  comment  写备注的列
-
-形状（data/text_resources.json）：
-  messages     消息表：单元 = 消息号，一格 = DAT1 正文
-  string_pairs 短串表：单元 = 条目下标，格 = 条目里 u16 字段指到的 STR1 字符串
+**整表重写**：译文列与底稿列都落成源素材原文，要保留的译文先备份。
 """
 
 import os

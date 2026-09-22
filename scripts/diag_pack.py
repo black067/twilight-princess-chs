@@ -1,16 +1,6 @@
-"""验收判定：按引擎 ShiftJIS 路径解码包内文本，检查
-  1) 消息是否会在中途被判为结束（对白切断）
-  2) 画出来的码位是否都在补丁字库里（缺字）
-  3) 名字键盘（l_mojiZh）550 格是否与构建产出的期望表（`paths.kb_json(space)`）
-     一致，且补全槽的像素非空（只对 open 变体：键盘补全是它独有的）
+"""验收判定：按引擎路径解码包内文本，查消息截断、缺字与名字键盘 550 格。
 
-跑哪个变体由 --variant 定（不给时 open）：变体自己那份字库与文本部件。
---code-space 定键盘期望表（`own` / `sjis`）。
-
-引擎路径（源码）：
-  parseCharacter_ShiftJIS: 首字节不是前导(0x81-0x9F/0xE0-0xFC) => 只吃 1 字节
-  process_character_: iCharacter==0 => 消息结束；==0x1A => tag；否则字符
-  on_tag_: 下一元素 = marker + size（marker 1 字节），tag 处理器拿到 size-5 字节
+解码按引擎来：首字节不是前导（0x81–0x9F / 0xE0–0xFC）只吃 1 字节；`0` 结束消息，`0x1A` 后跟 1 字节 size。
 """
 
 import collections

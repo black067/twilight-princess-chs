@@ -1,20 +1,7 @@
 """从零生成字库：BFN 与 RARC 自己写，只吃「码位表 + 键盘表 + 开源字体」。
 
-输入
-  work/code_map.json        字符 -> 码位（build_bmg.py 写的那一份，两边必须一致）
-  data/name_keyboard.json   引擎名字键盘（l_mojiZh）的码位表
-  config 的 fonts.<name>    file（TTF/OTF）、em、gamma；ascent/descent/leading 可另配
-输出
-  work/scratch_parts/fontres.arc / rubyres.arc   Yaz0 压的 RARC（内是自造 BFN），可直接打包
-  work/keyboard_aliases.json                     diag_pack.py 核名字键盘用的期望表
-
-字形槽（glyph index）自己排：0x00..0x5F 给 ASCII（`MAP1` method 0 恒等：槽 = 码位 − 0x20，
-这样 `mMaxCode` 停在 0x20，引擎不做「半角转全角」），其余字符按码位升序接在后面。
-码位来自两处：译文的码位（`work/code_map.json`）与引擎自己会插入/查表的固定码位
-（ASCII、group-6 图标、名字键盘 550 格、默认名单字节 0xA1..0xA5）。
-
-WID1（字宽表）自己算：前进宽度 = 字体前进宽度（em）× 该字库的全角宽度（`INF1.width`），
-前导偏移按渲染出的墨迹居中，两个值都是「格宽的 1/48」为单位。
+字形槽 `0x00..0x5F` 留给 ASCII（`MAP1` method 0 恒等：槽 = 码位 − 0x20），其余按码位升序接在后面；
+字宽表按字体前进宽度算。
 """
 
 import json

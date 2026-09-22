@@ -1,22 +1,9 @@
-"""开源字体渲染字库字形位图（Windows GDI+ / ctypes，零第三方依赖）。
+"""用 GDI+ 渲染开源字体字形位图（零第三方依赖）。
 
-用途：
-  1. 作库被 patch_sjis_font.py 调用：--glyph-source open 时渲染 GLY1 全部像素；
-  2. 独立运行做标定/试印：
+名册 = 原字库 `MAP1` 的逆映射：method 3 取逆（码位即 Unicode），method 0 区间按 idx = 码位 − startCode 展开；
+每槽渲染成 48x48 一格，4x 超采样后盒式降采样、gamma 后量化成 I4。作库被 patch_sjis_font.py 调用。
 
-     python scripts/font_render.py --font fontres --ttf work/fonts/NotoSansCJKsc-Regular.otf \
-         --em 46 --png work/fonts/render_fontres.png
-
-原理（与字库的接口约定）：
-  - 名册 = 原字库 MAP1 逆映射：method-3 的 {码位: 字形索引} 取逆（码位即 Unicode），
-    method-0 区间按 idx = 码位 - startCode 展开（ASCII 槽 idx 0x20..0x7F -> 0..95）；
-  - 每个字形槽渲染成一格 cell（48x48）：GDI+ 路径（AddPathString -> bounds -> 平移 -> FillPath），
-    4x 超采样后盒式降采样，gamma 后量化为 I4（0..15，高值 = 墨）；
-  - 摆放：inherit 模式把新字形墨迹中心对准原字形墨迹中心（继承原版排版），
-    无原墨迹（新补槽）或 center 模式则对准格中心。
-
-平台门禁：渲染需要 Windows（GDI+ 在系统 gdiplus.dll 里）；本工具是维护者侧的资产生成，
-不进游戏运行链路。
+仅 Windows：GDI+ 在系统 gdiplus.dll 里。不进游戏运行链路，只是维护者侧的资产生成。
 """
 
 import ctypes
@@ -661,7 +648,7 @@ def main():
         sys.exit("需要 --ttf <字体文件>（或 config 的 fonts.<字库>.file）")
     arc_path = os.path.join(paths.font_source_dir(), "%s.arc.yaz0" % font_name)
     if not os.path.exists(arc_path):
-        sys.exit("缺少 %s：字库归档要放在参照字库目录里（见 docs/管线复现.md）" % arc_path)
+        sys.exit("缺少 %s：字库归档要放在参照字库目录里" % arc_path)
 
     t0 = time.time()
     with open(arc_path, "rb") as f:

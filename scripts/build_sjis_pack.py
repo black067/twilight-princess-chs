@@ -17,11 +17,9 @@ TEXT_FIELDS = ("id", "name", "version", "author", "description")
 # 里的路径时会自动回退到 res/icon.png、res/banner.png；站点也从包里取图）。
 IMAGE_FIELDS = {"icon": "res/icon.png", "banner": "res/banner.png"}
 
-# 本地闸门：站点已收录 22 个 mod 的 summary（= mod.json 的 description）最长 265、全部单行无链接。
-# 只有长度当硬限制，换行/链接只提示。
+# 站点侧限制：只有长度当硬限制，换行/链接只提示。
 MAX_NAME = 48
 MAX_DESCRIPTION = 265
-# 客户端 utils::is_valid_mod_id：小写字母/数字/下划线/点，首尾不能是点、不能有连续点（单段也合法）
 MOD_ID_RE = re.compile(r"^[a-z0-9_.]+$")
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 URL_RE = re.compile(r"https?://|www\.", re.IGNORECASE)
