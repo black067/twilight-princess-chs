@@ -123,7 +123,7 @@ def scan(path, fc):
 def check_name_keyboard(path, fm, kb_path):
     """名字键盘 550 格逐格核对：
     1) 补丁字库里该码位的字形与 patch_sjis_font 落盘的期望表一致；
-    2) 补全槽（新增渲染的格子）像素非空。
+    2) 补全的字形格（新增渲染的格）像素非空。
     """
     if not os.path.exists(kb_path):
         print("名字键盘: 缺 %s（先生成字库）" % kb_path)
@@ -160,7 +160,7 @@ def check_name_keyboard(path, fm, kb_path):
             ink += sum(1 for v in img[base : base + fields["cellWidth"]] if v)
         if not ink:
             empty.append((slot, ch))
-    print("   补全槽像素: %d 槽，空字形 %d %s"
+    print("   补全的字形格像素: %d 格，空字形 %d %s"
           % (len(t["new_chars"]), len(empty), ["%#x:%s" % e for e in empty[:8]]))
 
 
@@ -172,7 +172,7 @@ def main():
     fontres_path = dict(paths.font_parts(variant))["fontres.arc"]
     fm = font_map(fontres_path)
     fc = set(fm)
-    print("字库码位: %d（%s 变体 / %s 码位空间）" % (len(fc), variant, space))
+    print("字库码位: %d（%s 变体 / %s 码位方案）" % (len(fc), variant, space))
     tot = collections.Counter()
     tot_missing = collections.Counter()
     msgs = 0

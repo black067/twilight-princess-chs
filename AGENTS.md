@@ -41,6 +41,18 @@ Test: If this comment is deleted, would a future maintainer make a mistake? If n
 - Do not include feature summaries, usage stories, or requirement background.
 - Include examples only when the example is part of a contract test.
 
+## Doc and Script Division
+
+- Pipeline facts belong to scripts: what a script reads, writes, where its products land, which flags it
+  takes, and the expected values of its checks. State them in the script itself (docstring, usage, runtime output).
+- Docs must not keep reverse indexes: do not list "who uses this" or "who writes this" inside the description
+  of a thing. No "written by" column in a directory table, no "which scripts read this" in a config table.
+- State product flow once, upstream: source material, intermediates, part dirs, packages. One table naming
+  the step that produces each product and the step that consumes it.
+- Docs carry only what scripts cannot express: external format contracts (BMG / BFN / RARC fields and offsets),
+  engine behavior and forbidden zones, source-material facts, naming and expansion conventions.
+- Commands and their order live in one place (`docs/构建指南.md`); other docs reference it.
+
 ## Code Structure and Modifiers
 
 - Express intent through names, types, interfaces, and tests, not comments that compensate for bad naming.

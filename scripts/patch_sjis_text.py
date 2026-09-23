@@ -15,7 +15,7 @@ import patch_sjis_font as PSF
 import text_resources as TR
 
 MAP_JSON = paths.sjis_map_json()
-OUT_DIR = paths.parts_dir(paths.ORIGIN_VARIANT)   # 就地改写只出 origin 变体，文本部件落在它自己的目录
+OUT_DIR = paths.parts_dir(paths.ORIGIN_VARIANT)   # 改现成素材只出 origin 变体，文本资源写在它自己的目录
 
 SHIFT_JIS_ENCODING = 3
 TAG = 0x1A
@@ -139,9 +139,9 @@ def encode(tokens, remap):
 
 
 def message_slots(blob):
-    """({DAT1 槽起点: token 列表}, [(消息下标, 槽起点)])：按生产几何切。
+    """({DAT1 文本起点: token 列表}, [(消息下标, 文本起点)])：按生产几何切。
 
-    原归档允许两条消息共用一段文本（后缀共享），所以按不同偏移切、按槽去重。
+    原归档允许两条消息共用一段文本（后缀共享），所以按不同偏移切、按文本起点去重。
     """
     encoding = encoding_of(blob)
     width = 2 if encoding == 2 else 1
@@ -171,12 +171,12 @@ def default_name_bytes(text):
     chars = PSF.name_default_chars()
     missing = [ch for ch in text if ch not in chars]
     if missing:
-        sys.exit("默认名 %r 里有 lang 段 default_name_chars 没收的字：%s" % (text, missing))
+        sys.exit("默认名 %r 里有本地化方案 default_name_chars 没收的字：%s" % (text, missing))
     return bytes(PSF.NAME_DEFAULT_BASE + chars.index(ch) for ch in text)
 
 
 def name_cells(inner, resource):
-    """{条目下标: 格子键}：配置里要按单字节码位写的格子（按消息号表对号）。"""
+    """{条目下标: 译表 key}：配置里要按单字节码位写的条目（按消息号表对号）。"""
     wanted = set(PSF.default_name_cells())
     if not wanted:
         return {}
@@ -240,7 +240,7 @@ def patch_mesg(blob, remap, resource=""):
         limit = dat_abs + bounds[j]
         text = wanted[idx]
         enc = default_name_bytes(text)
-        assert len(enc) <= limit - start, "消息 %d 放不下：%r 需 %d 字节，槽位 %d" % (
+        assert len(enc) <= limit - start, "消息 %d 放不下：%r 需 %d 字节，可用 %d" % (
             idx, text, len(enc), limit - start)
         blob[start : start + len(enc)] = enc
         for i in range(start + len(enc), limit):

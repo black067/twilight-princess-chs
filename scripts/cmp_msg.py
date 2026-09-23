@@ -69,7 +69,7 @@ def main():
     ap.add_argument("--dusk", help="成品包，默认取 config 的 out/<id>.dusk")
     ap.add_argument("--entry", help="包内条目，默认 overlay/res/<消息目录>/bmgres.arc")
     ap.add_argument("--ids", default="99,100,101,102,175")
-    ap.add_argument("--cn-entry", default="bmgres.arc", help="源素材目录下的部件名，对照用")
+    ap.add_argument("--cn-entry", default="bmgres.arc", help="源素材目录下的资源名，对照用")
     args = ap.parse_args()
     ids = [int(x) for x in args.ids.split(",")]
     region, language = paths.pick_disc(args.disc, "--disc")

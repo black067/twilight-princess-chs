@@ -3,7 +3,7 @@
 /dist/
 /build/
 /no-vcs/
-/scripts/config.json
+/scripts/config.local.json
 
 .venv/
 *.log

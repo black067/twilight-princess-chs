@@ -1,6 +1,6 @@
-"""从 lang 段的 source 目录导出译文表 <input_dir>/texts.<lang>.csv。
+"""从本地化方案的 source 目录导出译文表 <input_dir>/texts.<lang>.csv。
 
-**整表重写**：译文列与底稿列都落成源素材原文，要保留的译文先备份。
+**整表重写**：译文列与底稿列都写入源素材原文，要保留的译文先备份。
 """
 
 import os
@@ -20,7 +20,7 @@ COL_COMMENT = "comment"
 
 
 def file_cells(blob, resource, shape, spec):
-    """{key: token 列表}：按形状读出这个文件里每一格的文本。"""
+    """{key: token 列表}：按类型读出这个文件里每一条文本。"""
     encoding = PST.encoding_of(blob)
     if shape["shape"] == "messages":
         keys = TR.message_keys(resource, spec["mid1"])
@@ -30,7 +30,7 @@ def file_cells(blob, resource, shape, spec):
     secs = dict((t, (o, s)) for t, o, s in PST.sections(blob))
     inf, str1 = secs.get(b"INF1"), secs.get(b"STR1")
     if not inf or not str1 or shape.get("pool") != "STR1":
-        sys.exit("%s 的形状与归档不符（string_pairs 需要 INF1 + STR1）" % resource)
+        sys.exit("%s 的类型与归档不符（string_pairs 需要 INF1 + STR1）" % resource)
     cnt, esize = struct.unpack_from(">HH", blob, inf[0] + 8)
     pool = blob[str1[0] + 8 : str1[0] + str1[1]]
     out = {}

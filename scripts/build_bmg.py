@@ -1,4 +1,4 @@
-"""从零生成消息归档：RARC 与 BMG 全部自己写，只吃「索引表 + 形状表 + 译文」。
+"""从零生成消息归档：RARC 与 BMG 全部自己写，只吃「索引表 + 类型表 + 译文」。
 
 同时写出容器与字库共用的码位表（`work/<lang>/code_map.json`）。
 """
@@ -38,7 +38,7 @@ def block(tag, payload):
 
 
 def build_messages(src, spec, resource, rows, remap, default_names=False):
-    """重建消息表：正文按 texts.csv 重排（每条一个槽），属性来自索引，尾部块原样接上。"""
+    """重建消息表：正文按 texts.csv 重排（每条一段），属性来自索引，尾部块原样接上。"""
     n, esize = spec["entries"], spec["entrySize"]
     ids = spec["mid1"]
     assert len(ids) == n, (len(ids), n)
@@ -86,7 +86,7 @@ def build_messages(src, spec, resource, rows, remap, default_names=False):
 
 
 def build_unit(src, spec, resource, shape, rows, remap):
-    """重建短串表：STR1 自排，条目保留原有字段，只换两个字符串偏移。
+    """重建单位表：STR1 自排，条目保留原有字段，只换两个字符串偏移。
 
     标签由引擎拼成 `"%d %s"` 插进消息串（`dMsgUnit_c::setTag`），所以跟正文一样编码：
     ASCII 与换行 1 字节、其余查码位表后 2 字节，`0000` 收尾。
@@ -94,7 +94,7 @@ def build_unit(src, spec, resource, shape, rows, remap):
     secs = dict((t, (o, s)) for t, o, s in PST.sections(src))
     inf, dat, str1 = secs.get(b"INF1"), secs.get(b"DAT1"), secs.get(b"STR1")
     if not (inf and dat and str1) or shape.get("pool") != "STR1":
-        sys.exit("%s 的形状与归档不符（string_pairs 需要 INF1 + DAT1 + STR1）" % resource)
+        sys.exit("%s 的类型与归档不符（string_pairs 需要 INF1 + DAT1 + STR1）" % resource)
     n, esize = struct.unpack_from(">HH", src, inf[0] + 8)
     assert n == spec["entries"], (n, spec["entries"])
 
@@ -117,7 +117,7 @@ def build_unit(src, spec, resource, shape, rows, remap):
 
 
 def expand_attrs(spec):
-    """每条消息的属性字节（表里存去重表 + 游程）。"""
+    """每条消息的属性字节（表里存去重表 + 每段的重复次数）。"""
     pool = [bytes.fromhex(h) for h in spec["attrs"]]
     runs = spec["attrRuns"]
     out = []
@@ -128,7 +128,7 @@ def expand_attrs(spec):
 
 
 def slot_index(src, spec):
-    """[(消息下标, DAT1 槽起点)]：从源文件里读 INF1 的偏移列。"""
+    """[(消息下标, DAT1 文本起点)]：从源文件里读 INF1 的偏移列。"""
     off = src.find(b"MESG")
     size = struct.unpack_from(">I", src, off + 8)[0]
     inner = src[off : off + size]
@@ -257,10 +257,10 @@ def main():
     if SPACE == "own":
         remap = {ord(ch): code for ch, code in mapping.items()}
     else:
-        # 沿用现有字库的码位空间（`sjis_map.py` 的 remap：原码位 -> 现有字库的码位）
+        # 沿用现有字库的那套码位（`sjis_map.py` 的 remap：原码位 -> 现有字库的码位）
         with open(paths.sjis_map_json(), encoding="utf-8") as f:
             remap = {int(k, 16): int(v, 16) for k, v in json.load(f)["remap"].items()}
-        print("码位空间：%s（沿用现有字库 %d 条重映射）" % (SPACE, len(remap)))
+        print("码位方案：%s（沿用现有字库 %d 条重映射）" % (SPACE, len(remap)))
 
     # ---- 第二遍：逐归档重建
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -279,7 +279,7 @@ def main():
             elif shape["shape"] == "string_pairs":
                 w.add(f["name"], build_unit(src, f, resource, shape, rows, remap))
             else:
-                sys.exit("不认识的形状 %r（%s）" % (shape["shape"], resource))
+                sys.exit("不认识的类型 %r（%s）" % (shape["shape"], resource))
         out = os.path.join(OUT_DIR, base)
         raw = w.build()
         self_check(raw, spec, shapes)

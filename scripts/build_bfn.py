@@ -1,6 +1,6 @@
 """从零生成字库：BFN 与 RARC 自己写，只吃「码位表 + 键盘表 + 开源字体」。
 
-字形槽 `0x00..0x5F` 留给 ASCII（`MAP1` method 0 恒等：槽 = 码位 − 0x20），其余按码位升序接在后面；
+字形格 `0x00..0x5F` 留给 ASCII（`MAP1` method 0 恒等：格 = 码位 − 0x20），其余按码位升序接在后面；
 字宽表按字体前进宽度算。
 """
 
@@ -28,11 +28,11 @@ KB_JSON = paths.kb_json(paths.DEFAULT_CODE_SPACE)
 CELL = 48                      # 字形格边长（与原字库一致；引擎按格取纹理 UV）
 ROWS = 64                      # 图集横向格数：纹理宽 = ROWS*CELL，高 = 列数*CELL
 ASCII_LO, ASCII_HI = 0x20, 0x7F
-BLANK_SLOT = ASCII_HI - ASCII_LO        # 0x7F（DEL，不渲染）= 通用空白槽
+BLANK_SLOT = ASCII_HI - ASCII_LO        # 0x7F（DEL，不渲染）= 通用空白格
 # (ascent, descent, width, leading)：与游戏排版对齐的度量，config 的 fonts.<name> 可覆盖。
 # width 同时是全角前进宽度（引擎的 getWidth() / WID1 单位 = 格宽的 1/48）
 DEFAULT_METRICS = {"fontres": (42, 6, 42, 48), "rubyres": (43, 5, 48, 48)}
-# 部件名 -> 引擎按名字取的 BFN 名（mDoExt_initFont0/1 里写死）
+# 资源名 -> 引擎按名字取的 BFN 名（mDoExt_initFont0/1 里写死）
 FONTS = (("fontres", "rodan_b_24_22.bfn"), ("rubyres", "reishotai_24_22.bfn"))
 
 # 引擎把半角 ASCII 转成全角码位时用的表（`JUTResFont::getFontCode` 里的同名字表）。
@@ -83,7 +83,7 @@ def code_chars():
 
 
 def halfwidth_aliases(slots):
-    """[(全角码位, ASCII 槽)]：半角 ASCII 转成的全角码位也指到同一字形。"""
+    """[(全角码位, ASCII 格)]：半角 ASCII 转成的全角码位也指到同一字形。"""
     out = []
     for i, code in enumerate(HALF_TO_FULL):
         ascii_code = ASCII_LO + i
@@ -93,7 +93,7 @@ def halfwidth_aliases(slots):
 
 
 def slots_of(pairs):
-    """({码位: 字形槽}, 槽总数)：ASCII 走 method 0 恒等，其余按码位升序。"""
+    """({码位: 字形格}, 格总数)：ASCII 走 method 0 恒等，其余按码位升序。"""
     slots = {c: c - ASCII_LO for c in range(ASCII_LO, ASCII_HI + 1)}
     nxt = ASCII_HI - ASCII_LO + 1
     for code in sorted(c for c in pairs if c not in slots):
@@ -103,7 +103,7 @@ def slots_of(pairs):
 
 
 def roster_of(slots, pairs):
-    """{字形槽: 字符}。"""
+    """{字形格: 字符}。"""
     roster = {c - ASCII_LO: chr(c) for c in range(ASCII_LO, ASCII_HI + 1)}
     roster.update({slot: pairs[code] for code, slot in slots.items()
                    if not ASCII_LO <= code <= ASCII_HI})
@@ -111,7 +111,7 @@ def roster_of(slots, pairs):
 
 
 def geometry(total):
-    """GLY1 字段：单页图集，槽数容得下 total。"""
+    """GLY1 字段：单页图集，格数容得下 total。"""
     rows = ROWS
     cols = -(-total // rows)
     tw, th = rows * CELL, cols * CELL
@@ -123,7 +123,7 @@ def geometry(total):
 
 
 def ink_boxes(atlas, fields):
-    """{槽: (x0, x1)}：图集里每格墨迹的横向范围，无墨迹的槽不出现。"""
+    """{格: (x0, x1)}：图集里每格墨迹的横向范围，无墨迹的格不出现。"""
     tw, cw, ch = fields["textureWidth"], fields["cellWidth"], fields["cellHeight"]
     rows = fields["numRows"]
     out = {}
@@ -147,7 +147,7 @@ def ink_boxes(atlas, fields):
 
 
 def wid_entries(roster, boxes, adv_em, total, full):
-    """[(前导偏移, 前进宽度)]：每条对应一个字形槽。"""
+    """[(前导偏移, 前进宽度)]：每条对应一个字形格。"""
     out = []
     for slot in range(total):
         ch = roster.get(slot)
@@ -197,7 +197,7 @@ def build_bfn(slots, fields, atlas, metrics, wid):
 
 
 def engine_lookup(bfn, code):
-    """按引擎 getFontCode 的取法求字形槽（method 0 恒等 + method 3 二分）。"""
+    """按引擎 getFontCode 的取法求字形格（method 0 恒等 + method 3 二分）。"""
     _, body, blocks = R.parse_bfn(bfn)
     for magic, off, size in blocks:
         if magic != b"MAP1":
@@ -271,7 +271,7 @@ def self_check(arc, inner, slots, fields, wid, kb):
         got = engine_lookup(found, code)
         assert got == slot, "码位 %#06x 查表得到 %s，应为 %s" % (code, got, slot)
     for code in kb:
-        assert engine_lookup(found, code) == slots[code], "名字键盘码位 %#04x 查不到槽" % code
+        assert engine_lookup(found, code) == slots[code], "名字键盘码位 %#04x 查不到格" % code
     return found
 
 
@@ -285,7 +285,7 @@ def main():
     code_slots = dict(slots)
     code_slots.update(halfwidth_aliases(slots))      # 全角 ASCII 码位也指到 ASCII 字形
     cells = ROWS * (-(-total // ROWS))
-    print("码位 %d 个（其中 ASCII %d、名字键盘 %d、全角 ASCII 别名 %d），字形槽 %d 个，图集 %d 格"
+    print("码位 %d 个（其中 ASCII %d、名字键盘 %d、全角 ASCII 别名 %d），字形格 %d 个，图集 %d 格"
           % (len(code_slots), ASCII_HI - ASCII_LO + 1, len(kb),
              len(code_slots) - len(pairs), total, cells))
     assert total <= cells, (total, cells)
@@ -309,7 +309,7 @@ def main():
         missing = [(s, c) for s, c in drawable if ord(c) not in cmap]
         if missing:
             for slot, ch in missing[:20]:
-                print("   缺字 槽 %#x 码位 U+%04X %r" % (slot, ord(ch), ch))
+                print("   缺字 格 %#x 码位 U+%04X %r" % (slot, ord(ch), ch))
             sys.exit("字体缺 %d 个字符（不允许静默缺字）：%s" % (len(missing), ttf))
 
         fields = geometry(total)

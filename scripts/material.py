@@ -1,4 +1,4 @@
-"""素材读取层：读 `<input_dir>/` 下 Yaz0 压缩的 RARC（字库目录按 lang 段的 `font_source`，消息库按 `source`）。
+"""素材读取层：读 `<input_dir>/` 下 Yaz0 压缩的 RARC（字库目录按本地化方案的 `font_source`，消息库按 `source`）。
 """
 
 import os
@@ -12,7 +12,7 @@ SUFFIX = ".yaz0"
 
 
 def _load(dirpath, what):
-    """[(部件名, 解 Yaz0 后的字节)]：目录下所有 <部件名>%s，按名字排序。""" % SUFFIX
+    """[(资源名, 解 Yaz0 后的字节)]：目录下所有 <资源名>%s，按名字排序。""" % SUFFIX
     if not os.path.isdir(dirpath):
         sys.exit("缺 %s（%s）：把素材放到这里" % (dirpath, what))
     out = []
@@ -27,12 +27,12 @@ def _load(dirpath, what):
 
 
 def font_arcs():
-    """{部件名: RARC}：参照字库部件（fontres.arc / rubyres.arc）。"""
+    """{资源名: RARC}：参照字库资源（fontres.arc / rubyres.arc）。"""
     return dict(_load(paths.font_source_dir(), "字库"))
 
 
 def msg_arcs():
-    """[(部件名, RARC)]：当前语言的源素材目录下的消息库部件（bmgres.arc / bmgres1.arc …）。"""
+    """[(资源名, RARC)]：当前语言的源素材目录下的消息库资源（bmgres.arc / bmgres1.arc …）。"""
     return _load(paths.source_dir(), "消息库")
 
 

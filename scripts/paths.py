@@ -1,6 +1,6 @@
-"""外部路径与默认配置的统一入口。
+"""外部路径与配置的统一入口
 
-`config.example.json` 是完整默认值，`config.json` 只写本机差异，`--xxx` 命令行再覆盖。
+`config.default.json` 是固有打包参数，`config.local.json` 只写本机差异，`--xxx` 命令行再覆盖。
 """
 
 import json
@@ -11,41 +11,41 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 WORK = os.path.join(ROOT, "work")
 DATA = os.path.join(ROOT, "data")
-CONFIG = os.path.join(HERE, "config.json")
-CONFIG_EXAMPLE = os.path.join(HERE, "config.example.json")
+CONFIG_LOCAL = os.path.join(HERE, "config.local.json")
+CONFIG_DEFAULT = os.path.join(HERE, "config.default.json")
 
 # 变体名（别的脚本读常量，别写字面量）：open = 容器与字库从零生成；
-# origin = 就地改写现有素材，保留原字库位图。
+# origin = 改现成素材，保留原字库位图。
 OPEN_VARIANT = "open"
 ORIGIN_VARIANT = "origin"
 # 两个成品变体：(变体名, config 里的元信息段)
 VARIANTS = ((OPEN_VARIANT, "mod"), (ORIGIN_VARIANT, "mod_origin"))
 # 不带 --variant 时打的变体（其余变体要在命令行显式指定）
 PUBLISHED_VARIANTS = (OPEN_VARIANT,)
-# 部件目录（字库 + 文本）也在 work 下由这里定：一个变体一个目录，两条路线各写各的
+# 资源目录（字库 + 文本）也在 work 下由这里定：一个变体一个目录，互不覆盖
 PARTS_DIR = {OPEN_VARIANT: "parts.open", ORIGIN_VARIANT: "parts.origin"}
-# 字库部件文件名：不带槽位，同一个部件要写进各地区的 Font<region> 目录
+# 字库资源文件名：不带地区，同一个资源要写进各地区的 Font<region> 目录
 FONT_PART_NAMES = ("fontres.arc", "rubyres.arc")
 
 
 def parts_dir(variant):
-    """变体的部件目录（work/<lang>/ 下）：两条路线各出自己的字库与文本，不互相覆盖。"""
+    """变体的资源目录（work/<lang>/ 下）：各出各的字库与文本，不互相覆盖。"""
     return os.path.join(work_dir(), PARTS_DIR[variant])
 
 
 def font_parts(variant):
-    """[(部件名, 路径)]：变体的两套字库部件。"""
+    """[(资源名, 路径)]：变体的两套字库资源。"""
     return [(n, os.path.join(parts_dir(variant), n)) for n in FONT_PART_NAMES]
 
 
 def text_parts(variant):
-    """[(部件名, 路径)]：变体自己那份文本部件（码位空间与它的字库配套）。"""
+    """[(资源名, 路径)]：变体自己那份文本资源（码位方案与它的字库配套）。"""
     d = parts_dir(variant)
     if not os.path.isdir(d):
         return []
     return [(n, os.path.join(d, n)) for n in sorted(os.listdir(d)) if n.startswith("bmgres")]
 
-# 字库与文本必须同一码位空间，所以中间产物目录与键盘期望表都按空间分开
+# 字库与文本必须同一码位方案，所以中间产物目录与键盘期望表都按方案分开
 CODE_SPACES = ("own", "sjis")
 DEFAULT_CODE_SPACE = "own"
 SCRATCH_DIR = {"own": "parts.open.own", "sjis": "parts.open.sjis"}
@@ -73,7 +73,7 @@ def msg_index_json():
 
 
 def font_source_dir():
-    """参照字库目录（lang 段 font_source，缺省 <input_dir>/font）。"""
+    """参照字库目录（本地化方案的 font_source，缺省 <input_dir>/font）。"""
     value = lang_value("font_source")
     if not value:
         return os.path.join(input_dir(), "font")
@@ -88,7 +88,7 @@ KEYS = {
     "--game-config": "game_config",
 }
 
-# 替换槽位：字库目录跟 region（Font<region>），消息目录跟 language（Msg<language>）
+# 替换目录：字库目录跟 region（Font<region>），消息目录跟 language（Msg<language>）
 REGIONS = ("us", "eu", "jp")
 LANGUAGES = ("uk", "us", "de", "fr", "sp", "it", "jp")
 LANG_REGION = {"uk": "eu", "de": "eu", "fr": "eu", "sp": "eu", "it": "eu", "jp": "jp"}
@@ -149,8 +149,8 @@ def _drop_placeholders(doc):
 def _config():
     global _cache
     if _cache is None:
-        _cache = _overlay(_drop_placeholders(_load(CONFIG_EXAMPLE)),
-                          _drop_placeholders(_load(CONFIG)))
+        _cache = _overlay(_drop_placeholders(_load(CONFIG_DEFAULT)),
+                          _drop_placeholders(_load(CONFIG_LOCAL)))
     return _cache
 
 
@@ -169,12 +169,12 @@ def _langs():
     langs = config_value("langs")
     if not isinstance(langs, dict) or not langs:
         sys.exit("%s 里缺 langs（每个语言一段：source / draft_col / locale_col / discs / mod）"
-                 % CONFIG)
+                 % CONFIG_DEFAULT)
     return langs
 
 
 def lang():
-    """本次作业的语言（--lang，缺省 default_lang；配置里只有一个时就用它）。"""
+    """本次要处理的语言（--lang，缺省 default_lang；配置里只有一个时就用它）。"""
     name = cli("--lang") or config_value("default_lang")
     langs = _langs()
     if not name:
@@ -188,7 +188,7 @@ def lang():
 
 
 def lang_config():
-    """当前语言的全量配置：lang 段递归覆盖顶层（顶层 fonts 是默认值，lang 段可只覆盖要改的）。"""
+    """当前语言的全量配置：本地化方案递归覆盖顶层（顶层 fonts 是默认值，本地化方案可只覆盖要改的）。"""
     return _overlay(_config(), _langs()[lang()])
 
 
@@ -203,10 +203,10 @@ def work_dir():
 
 
 def source_dir():
-    """lang 段的 source：该语言要导出的解包素材目录。"""
+    """本地化方案的 source：该语言要导出的解包素材目录。"""
     value = lang_value("source")
     if not value:
-        sys.exit("%s 的 langs.%s 里缺 source（解包素材目录）" % (CONFIG, lang()))
+        sys.exit("%s 的 langs.%s 里缺少 source (解包素材目录)" % (CONFIG_DEFAULT, lang()))
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
@@ -224,7 +224,7 @@ def texts_file():
 def _col(key):
     value = lang_value(key)
     if not value:
-        sys.exit("%s 的 langs.%s 里缺 %s（列名）" % (CONFIG, lang(), key))
+        sys.exit("%s 的 langs.%s 里缺少 %s (列名)" % (CONFIG_DEFAULT, lang(), key))
     return value
 
 
@@ -261,7 +261,7 @@ def code_space():
 def _need(name, what):
     value = option(name)
     if not value:
-        sys.exit("%s：在 %s 里填 \"%s\"，或用 %s <路径> 指定" % (what, CONFIG, KEYS.get(name, name.lstrip("-")), name))
+        sys.exit("%s：在 %s 里填 \"%s\"，或用 %s <路径> 指定" % (what, CONFIG_LOCAL, KEYS.get(name, name.lstrip("-")), name))
     return value
 
 
@@ -281,7 +281,7 @@ def discs():
     """[(region, language)]：当前语言的 discs，逐个校验。"""
     raw = lang_value("discs")
     if not isinstance(raw, list) or not raw:
-        sys.exit("%s 的 langs.%s 里缺 discs（每个盘一项 {region, language}）" % (CONFIG, lang()))
+        sys.exit("%s 的 langs.%s 里缺 discs (每个盘一项 {region, language})" % (CONFIG_DEFAULT, lang()))
     out = []
     for item in raw:
         region = str((item or {}).get("region") or "").lower()
@@ -292,7 +292,7 @@ def discs():
             sys.exit("discs 里的 language 无效：%r（可选 %s）" % (language, " / ".join(LANGUAGES)))
         expect = LANG_REGION.get(language)
         if expect and expect != region:
-            print("警告：language=%s 通常出现在 %s 版盘，region=%s 可能没有该消息槽"
+            print("警告：language=%s 通常出现在 %s 版盘，region=%s 可能没有该消息目录"
                   % (language, expect, region), file=sys.stderr)
         out.append((region, language))
     return out
@@ -343,10 +343,10 @@ def escape_mod_id(mod_id):
 
 
 def out_dir():
-    """成品包目录（out：顶层默认，lang 段可覆盖）。"""
+    """成品包目录（out：顶层默认，本地化方案可覆盖）。"""
     value = lang_value("out")
     if not value:
-        sys.exit("%s 里缺 out（成品包目录）" % CONFIG)
+        sys.exit("%s 里缺少 out (成品包目录)" % CONFIG_DEFAULT)
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
@@ -355,8 +355,8 @@ def mod_meta(variant, region, language):
     key = dict(VARIANTS)[variant]
     meta = lang_value(key)
     if not isinstance(meta, dict) or not meta.get("id"):
-        sys.exit("%s 的 langs.%s 里缺 %s 段（id/name/version/author/description）"
-                 % (CONFIG, lang(), key))
+        sys.exit("%s 的 langs.%s 里缺少 %s 段 (需要: id/name/version/author/description)"
+                 % (CONFIG_DEFAULT, lang(), key))
     out = dict(meta)
     out["id"] = expand_id(str(out["id"]), region, language)
     for field in ("name", "description"):

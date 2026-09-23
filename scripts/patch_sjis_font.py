@@ -60,7 +60,7 @@ PAL_KEY_CODES = (
 )
 PAL_KEY_CHAR = {0x8C: "\u0152", 0x9C: "\u0153"}
 
-# 默认名（主角/马）用的单字节码位：一个字 = 一个 0xA1.. 码位。字表在 lang 段的
+# 默认名（主角/马）用的单字节码位：一个字 = 一个 0xA1.. 码位。字表在本地化方案的
 # default_name_chars（空 = 不改写默认名）。名字框逐字节取字符，而 0xA0..0xDF 在 ShiftJIS 里不是
 # 前导字节，字体与消息两条路径都当成完整码位，所以别名只能按完整码位建。
 NAME_DEFAULT_BASE = 0x00A1
@@ -71,12 +71,12 @@ def name_default_chars():
 
 
 def default_name_cells():
-    """要按单字节码位写的格子键（lang 段 default_name_cells；文本取自译文表）。"""
+    """要按单字节码位写的译表 key（本地化方案的 `default_name_cells`；文本取自译文表）。"""
     return [str(key) for key in (paths.lang_value("default_name_cells") or ())]
 
 
 class SlotPool:
-    """键盘补全用的槽位池：先捡空闲槽，不够再用图集末尾的空 tail 槽。"""
+    """键盘补全用的字形格池：先捡空闲格，不够再用图集末尾的空 tail 格。"""
 
     def __init__(self, free, tail):
         self.free = list(free)
@@ -87,13 +87,13 @@ class SlotPool:
             return self.free.pop(0)
         if self.tail:
             return self.tail.pop(0)
-        sys.exit("键盘补全缺少可用槽位：%s" % what)
+        sys.exit("键盘补全缺少可用的字形格：%s" % what)
 
 
 def pal_keyboard_aliases(orig_glyph, pool):
-    """引擎标准键盘（ABC/abc 两页）里字库缺失的格子：分配槽位并待渲染。
+    """引擎标准键盘（ABC/abc 两页）里字库缺失的格：分配字形格并待渲染。
 
-    返回 (aliases, new_chars)：new_chars = {新槽: 字符}。
+    返回 (aliases, new_chars)：new_chars = {新字形格: 字符}。
     """
     aliases = []
     new_chars = {}
@@ -130,8 +130,8 @@ def name_keyboard_aliases(orig_glyph, pool, open_mode=False):
     """引擎名字键盘字表（l_mojiZh）逐格别名。
 
     原字不在字库的：55 个日式写法换成对应简体字；其余格在 open 模式分配
-    空槽/tail 槽用渲染字形补全，original 模式保持指向空白字形（U+3000）。
-    返回 (aliases, new_chars, stats)：new_chars = {新槽: 字符}（待渲染）。
+    空字形格/tail 字形格用渲染字形补全，original 模式保持指向空白字形（U+3000）。
+    返回 (aliases, new_chars, stats)：new_chars = {新字形格: 字符}（待渲染）。
     """
     with open(NAME_KEYBOARD, encoding="utf-8") as f:
         doc = json.load(f)
@@ -168,10 +168,10 @@ def name_keyboard_aliases(orig_glyph, pool, open_mode=False):
 
 
 def name_default_aliases(orig_glyph):
-    """0xA1.. → default_name_chars 各字在字库里的既有字形槽（不新增槽、不重渲染）。"""
+    """0xA1.. → default_name_chars 各字在字库里的既有字形格（不新增字形格、不重渲染）。"""
     chars = name_default_chars()
     if not chars:
-        print("   默认名单字节别名: 跳过（lang 段没配 default_name_chars）")
+        print("   默认名单字节别名: 跳过（本地化方案没配 default_name_chars）")
         return ()
     aliases = []
     for i, char in enumerate(chars):
@@ -230,7 +230,7 @@ def main():
         doc = json.load(f)
     remap = {int(k, 16): int(v, 16) for k, v in doc["remap"].items()}
 
-    # 只认命令行：open 必须显式指定，否则会写脏 own 空间的部件目录
+    # 只认命令行：open 必须显式指定，否则会写脏 own 码位方案的资源目录
     source = paths.cli("--glyph-source") or "original"
     cli_ttf = None
     if source != "original":
@@ -255,7 +255,7 @@ def main():
     if kb_tables:
         with open(KB_JSON, "w", encoding="utf-8") as f:
             json.dump(kb_tables, f, ensure_ascii=False, indent=1)
-        print("wrote %s（%s 码位空间，搭配 build_bmg.py --code-space %s）"
+        print("wrote %s（%s 码位方案，搭配 build_bmg.py --code-space %s）"
               % (KB_JSON, OPEN_SPACE, OPEN_SPACE))
     else:
         print("没写 %s（只有 --glyph-source open 才写它）" % KB_JSON)
@@ -273,7 +273,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
             if variant == paths.OPEN_VARIANT:
                 ttf, em, gamma = font_settings(name, cli_ttf, cli_em)
                 if not ttf or not os.path.exists(ttf):
-                    sys.exit("%s 需要字体文件：config.json 的 fonts.%s.file，或 "
+                    sys.exit("%s 需要字体文件：config.default.json 的 fonts.%s.file，或 "
                              "--glyph-source open:<ttf>" % (paths.OPEN_VARIANT, name))
                 if ttf not in renderers:
                     renderers[ttf] = font.Renderer(ttf)
@@ -333,7 +333,7 @@ def build_font(material, remap, variant, out_dir, cli_ttf, cli_em, kb_tables):
                 missing = font.check_coverage(font.parse_cmap(ttf), roster)
                 if missing:
                     for idx, ch, cp in missing[:20]:
-                        print("   缺字 槽 %#x 码位 U+%04X %r" % (idx, cp, ch))
+                        print("   缺字 格 %#x 码位 U+%04X %r" % (idx, cp, ch))
                     sys.exit("名册含字体缺失字符 %d 个（不允许静默缺字）" % len(missing))
                 bboxes, _ = font.scan_bboxes(bytes(arc2), sorted(roster))
                 inf1 = font.read_inf1(bytes(arc2))

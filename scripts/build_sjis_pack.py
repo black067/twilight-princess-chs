@@ -9,7 +9,7 @@ import paths
 
 # name/description/id 里 {region} / {language} / {repo} 的展开在 paths.expand
 
-# mod.json 的文本字段：顺序即包内键序（客户端 manifest.cpp 按名字取，顺序无要求，
+# mod.json 的文本字段：顺序即包内字段顺序（客户端 manifest.cpp 按名字取，顺序无要求，
 # 但固定成 id→name→version→author→description→icon→banner，方便与包内内容对拍）。
 TEXT_FIELDS = ("id", "name", "version", "author", "description")
 
@@ -25,7 +25,7 @@ VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 URL_RE = re.compile(r"https?://|www\.", re.IGNORECASE)
 
 
-# 缺部件时提示该先跑哪个脚本（按变体）
+# 缺资源时提示该先跑哪个脚本（按变体）
 FONT_STEP = {paths.OPEN_VARIANT: "build_bfn.py", paths.ORIGIN_VARIANT: "patch_sjis_font.py"}
 TEXT_STEP = {paths.OPEN_VARIANT: "build_bmg.py", paths.ORIGIN_VARIANT: "patch_sjis_text.py"}
 
@@ -78,7 +78,7 @@ def check_meta(meta):
         for line in problems:
             print("  - %s" % line, file=sys.stderr)
         sys.exit("元数据没通过本地校验：改 %s 里的 %s"
-                 % (paths.CONFIG_EXAMPLE, " / ".join(key for _, key in paths.VARIANTS)))
+                 % (paths.CONFIG_DEFAULT, " / ".join(key for _, key in paths.VARIANTS)))
 
 
 def print_meta(meta):
@@ -132,19 +132,19 @@ def collect_images(meta):
 
 
 def overlay_entries(variant, region, language):
-    """部件 -> [(zip 内路径, 文件路径)]：字库写进 Font<region>，消息写进 Msg<language>。"""
+    """资源 -> [(zip 内路径, 文件路径)]：字库写进 Font<region>，消息写进 Msg<language>。"""
     fonts = paths.font_parts(variant)
     for name, path in fonts:
         if not os.path.exists(path):
-            sys.exit("缺字库部件 %s：先跑 %s" % (path, FONT_STEP[variant]))
+            sys.exit("缺字库资源 %s：先跑 %s" % (path, FONT_STEP[variant]))
     texts = paths.text_parts(variant)
     if not texts:
-        sys.exit("缺文本部件：先跑 %s（%s）" % (TEXT_STEP[variant], paths.parts_dir(variant)))
+        sys.exit("缺文本资源：先跑 %s（%s）" % (TEXT_STEP[variant], paths.parts_dir(variant)))
     return ([("overlay/res/%s/%s" % (paths.font_dir(region), n), p) for n, p in fonts]
             + [("overlay/res/%s/%s" % (paths.msg_dir(language), n), p) for n, p in texts])
 
 
-# zip 成员时间戳固定：同一份输入必须打出同一个包字节，否则打包时间进了产物、文件 sha256 无法当回归判据
+# zip 成员时间戳固定：同一份输入必须打出同一个包字节，否则打包时间进了产物、文件 sha256 就不能当回归的比对依据
 STAMP = (1980, 1, 1, 0, 0, 0)
 
 
@@ -177,11 +177,11 @@ def build(variant, meta, region, language, out_dir, check_only=False):
 
     out = os.path.join(out_dir, paths.escape_mod_id(meta["id"]) + ".dusk")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        # 字节格式：2 空格缩进、键序 id→…→banner、末尾不留换行、UTF-8 无 BOM
+        # 字节格式：2 空格缩进、字段顺序 id→…→banner、末尾不留换行、UTF-8 无 BOM
         add_bytes(z, "mod.json", json.dumps(meta, indent=2, ensure_ascii=False).encode("utf-8"))
         for arcname, path in entries:
             add_file(z, path, arcname)
-    print("built %s  %d bytes  id=%s  字库部件来自 %s"
+    print("built %s  %d bytes  id=%s  字库资源来自 %s"
           % (out, os.path.getsize(out), meta["id"], paths.PARTS_DIR[variant]))
     for arcname, _ in entries:
         print("   %s" % arcname)

@@ -21,7 +21,7 @@ ATTR_FIELDS = (b"INF1", b"DAT1", b"MID1", b"STR1")
 
 
 def runs(values):
-    """[值] -> (去重值列表, 游程)。"""
+    """[值] -> (去重值列表, 每段的重复次数)。"""
     pool, runs_out = [], []
     for value in values:
         if value not in pool:

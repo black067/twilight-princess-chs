@@ -1,7 +1,7 @@
 """用 GDI+ 渲染开源字体字形位图（零第三方依赖）。
 
 名册 = 原字库 `MAP1` 的逆映射：method 3 取逆（码位即 Unicode），method 0 区间按 idx = 码位 − startCode 展开；
-每槽渲染成 48x48 一格，4x 超采样后盒式降采样、gamma 后量化成 I4。作库被 patch_sjis_font.py 调用。
+每个字形格渲染成 48x48，4x 超采样后盒式降采样、gamma 后量化成 I4。作库被 patch_sjis_font.py 调用。
 
 仅 Windows：GDI+ 在系统 gdiplus.dll 里。不进游戏运行链路，只是维护者侧的资产生成。
 """
@@ -158,7 +158,7 @@ def read_inf1(bfn):
 
 
 def build_roster(entries, m0_ranges):
-    """名册：{字形槽 idx: 字符}。method-3 取逆 + method-0 恒等展开。"""
+    """名册：{字形格 idx: 字符}。method-3 取逆 + method-0 恒等展开。"""
     roster = {}
     trouble = []
     for code, idx in entries.items():
@@ -192,7 +192,7 @@ def check_coverage(cmap, roster):
 
 def scan_bboxes(bfn, idxes=None):
     """扫描原字库墨迹 bbox：返回 ({idx: (x0, y0, x1, y1)}, 直方图)。
-    bbox 为格内坐标、x1/y1 为开区间；只收集有墨迹的槽。"""
+    bbox 为格内坐标、x1/y1 为开区间；只收集有墨迹的格。"""
     _, body, blocks = R.parse_bfn(bfn)
     g = next(b for b in blocks if b[0] == b"GLY1")
     f = R.gly1_fields(body, g[1])
@@ -520,7 +520,7 @@ def render_atlas(renderer, roster, fields, em=DEFAULT_EM, gamma=DEFAULT_GAMMA,
     """渲染整页 GLY1 图集（未平铺，值 0..15，高值=墨）。
 
     fields: R.gly1_fields 的输出；bboxes: scan_bboxes 的 {idx: bbox}（inherit 用）；
-    place: inherit 时优先对原字形底边中心，否则（新补槽）坐 baseline 基线；
+    place: inherit 时优先对原字形底边中心，否则（新补的格）坐 baseline 基线；
     place=center 则全部用格中心；anchor: 基线的含义（bottom = 墨迹底边，baseline = 字体基线）。
     返回 (atlas bytearray(texW*texH), stats dict)。"""
     tw, th = fields["textureWidth"], fields["textureHeight"]
@@ -654,23 +654,23 @@ def main():
     with open(arc_path, "rb") as f:
         arc = yaz0.decompress(f.read())
     packed, fields = _repacked(arc)
-    print("单页重打包完成 %.1fs  GLY1 %dx%d cell %dx%d 槽位 %d"
+    print("单页重打包完成 %.1fs  GLY1 %dx%d cell %dx%d 字形格 %d"
           % (time.time() - t0, fields["textureWidth"], fields["textureHeight"],
              fields["cellWidth"], fields["cellHeight"], fields["endCode"] - fields["startCode"]))
 
     entries, m0 = read_map(packed)
     roster, trouble = build_roster(entries, m0)
-    print("名册 %d 槽（method-3 %d 条 + method-0 %s；重复冲突 %d）"
+    print("名册 %d 格（method-3 %d 条 + method-0 %s；重复冲突 %d）"
           % (len(roster), len(entries), m0, len(trouble)))
     for idx, a, b in trouble[:10]:
-        print("   槽 %#x 冲突: %r vs %r" % (idx, a, b))
+        print("   格 %#x 冲突: %r vs %r" % (idx, a, b))
     inf1 = read_inf1(packed)
     baseline = inf1["ascent"] if inf1 else DEFAULT_BASELINE
     print("INF1 %s" % inf1)
 
     t0 = time.time()
     bboxes, hist = scan_bboxes(packed, sorted(roster))
-    print("原字形扫描 %.1fs：有墨迹 %d 槽 / 空白 %d 槽；灰度直方图 %s"
+    print("原字形扫描 %.1fs：有墨迹 %d 格 / 空白 %d 格；灰度直方图 %s"
           % (time.time() - t0, len(bboxes), len(roster) - len(bboxes), hist))
     widths = [x1 - x0 for x0, y0, x1, y1 in bboxes.values()]
     heights = [y1 - y0 for x0, y0, x1, y1 in bboxes.values()]
@@ -693,7 +693,7 @@ def main():
     missing = check_coverage(cmap, roster)
     print("字体 %s cmap 覆盖 %d 码位；名册缺字 %d" % (os.path.basename(ttf), len(cmap), len(missing)))
     for idx, ch, cp in missing[:20]:
-        print("   缺字 槽 %#x 码位 U+%04X %r" % (idx, cp, ch))
+        print("   缺字 格 %#x 码位 U+%04X %r" % (idx, cp, ch))
     print("cmap 解析 %.1fs" % (time.time() - t0))
 
     t0 = time.time()
@@ -709,9 +709,9 @@ def main():
           % (stats["inherit"], stats["fallback"], stats["rescaled"], stats["clipped"],
              stats["blank"], stats["control"]))
     for idx, char in stats.get("clipped_list", [])[:15]:
-        print("   裁剪 槽 %#x %r" % (idx, char))
+        print("   裁剪 格 %#x %r" % (idx, char))
     for idx, char in stats.get("blank_list", [])[:15]:
-        print("   空字形 槽 %#x %r" % (idx, char))
+        print("   空字形 格 %#x %r" % (idx, char))
 
     write_png8(png, atlas_gray(atlas), fields["textureWidth"], fields["textureHeight"])
     print("渲染图已存 %s" % png)

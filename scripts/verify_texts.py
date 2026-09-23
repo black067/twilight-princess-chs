@@ -1,4 +1,4 @@
-"""对照校验：把变体自己那份部件按引擎口径解回字面串，与译文表逐格比。
+"""对照校验：把变体自己那份资源按引擎的方式解回字面串，与译文表逐条比。
 
 比较前先折算打包时的两处有意改写：`<T060005>` → 字面 `※`，默认名单字节码位 `0xA1–0xA5` → 对应汉字。
 """
@@ -66,7 +66,7 @@ def message_cells(blob, spec, resource, rev):
 
 
 def pair_cells(blob, resource, shape, rev):
-    """{key: token 列表}：短串表按引擎路径解（标签同正文一样编码，由 `%d %s` 拼进消息串）。"""
+    """{key: token 列表}：单位表按引擎路径解（标签同正文一样编码，由 `%d %s` 拼进消息串）。"""
     secs = dict((t, (o, s)) for t, o, s in PST.sections(blob))
     inf, str1 = secs[b"INF1"], secs[b"STR1"]
     n, esize = struct.unpack_from(">HH", blob, inf[0] + 8)
@@ -107,20 +107,20 @@ def main():
     if variant not in paths.PARTS_DIR:
         sys.exit("--variant 只支持 %s" % " / ".join(paths.PARTS_DIR))
     index, shapes = TR.load()
-    # origin 的码位恒为 sjis 空间
+    # origin 的码位固定用 sjis 方案
     space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
     want = texts.read(texts.file(), texts.col_locale() if variant == paths.OPEN_VARIANT
                       else texts.col_draft())
     rev = reverse_map(space)
     parts = paths.parts_dir(variant)
-    print("变体 %s（%s 码位空间）：部件 %s，对照 %s" % (variant, space, parts, texts.file()))
+    print("变体 %s（%s 码位方案）：资源 %s，对照 %s" % (variant, space, parts, texts.file()))
 
     bad = []
     total = 0
     for base, spec in sorted(index.items()):
         path = os.path.join(parts, base)
         if not os.path.exists(path):
-            sys.exit("缺部件 %s" % path)
+            sys.exit("缺资源 %s" % path)
         blobs = material.rarc_files(yaz0.decompress(open(path, "rb").read()))
         for f in spec["files"]:
             if "entries" not in f:

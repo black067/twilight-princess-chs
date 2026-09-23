@@ -1,5 +1,5 @@
 {
- "note": "文本资源形状：CSV 的 key = <资源>/<单元>[/<格名>]；单格资源省略格名。资源名 = BMG 文件名去掉 .bmg。",
+ "note": "文本资源类型：CSV 的 key = <资源>/<条目号>[/<字段名>]；只有一条的省略字段名。资源名 = BMG 文件名去掉 .bmg。",
  "resources": {
   "zel_00": {"shape": "messages"},
   "zel_01": {"shape": "messages"},
