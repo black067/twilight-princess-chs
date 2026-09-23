@@ -238,6 +238,16 @@ def main():
             sys.exit("--glyph-source 只支持 original 或 open[:<ttf>]：%s" % source)
         cli_ttf = source.split(":", 1)[1] if ":" in source else None
     cli_em = paths.option("--em")
+    inputs = paths.inputs_of(paths.sjis_map_json())
+    inputs.update(paths.inputs_of_dir(paths.font_source_dir()))
+    params = {}
+    if source != "original":
+        fonts = {}
+        for part in ("fontres", "rubyres"):
+            ttf, em, gamma = font_settings(part, cli_ttf, cli_em)
+            fonts[part] = {"file": ttf, "em": em, "gamma": gamma}
+        inputs.update(paths.inputs_of(*[v["file"] for v in fonts.values()]))
+        params["fonts"] = fonts
     if source == "original":
         jobs = [(paths.ORIGIN_VARIANT, paths.parts_dir(paths.ORIGIN_VARIANT))]
     else:
@@ -251,6 +261,7 @@ def main():
         print("### 变体 %s -> %s" % (variant, out_dir))
         os.makedirs(out_dir, exist_ok=True)
         build_font(arcs, remap, variant, out_dir, cli_ttf, cli_em, kb_tables)
+        paths.write_manifest(out_dir, variant, OPEN_SPACE, inputs=inputs, params=params)
 
     if kb_tables:
         with open(KB_JSON, "w", encoding="utf-8") as f:

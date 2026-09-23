@@ -292,10 +292,13 @@ def main():
 
     os.makedirs(OUT_DIR, exist_ok=True)
     tables = {}
+    font_inputs, font_params = [], {}
     for part, inner in FONTS:
         ttf, em, gamma = PSF.font_settings(part, CLI_TTF, CLI_EM)
         if not ttf or not os.path.exists(ttf):
             sys.exit("缺字体文件：config 的 fonts.%s.file（或 --ttf <路径>）" % part)
+        font_inputs.append(ttf)
+        font_params[part] = {"file": ttf, "em": em, "gamma": gamma}
         cfg = (paths.lang_value("fonts") or {}).get(part) or {}
         ascent, descent, width, leading = DEFAULT_METRICS[part]
         ascent = int(cfg.get("ascent") or ascent)
@@ -355,8 +358,11 @@ def main():
     with open(KB_JSON, "w", encoding="utf-8") as f:
         json.dump(tables, f, ensure_ascii=False, indent=1)
     print("wrote %s" % KB_JSON)
-    print("下一步：把 %s/*.arc 拷进 %s 再打包（diag_pack.py 会核键盘每一格）"
-          % (OUT_DIR, paths.parts_dir(paths.OPEN_VARIANT)))
+    inputs = paths.inputs_of(CODEMAP, os.path.join(paths.DATA, "name_keyboard.json"),
+                             *font_inputs)
+    paths.write_manifest(OUT_DIR, paths.OPEN_VARIANT, paths.DEFAULT_CODE_SPACE, inputs=inputs,
+                         params={"fonts": font_params})
+    print("产物在 %s，可以直接打包（diag_pack.py 会核键盘每一格）" % OUT_DIR)
 
 
 main()

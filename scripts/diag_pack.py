@@ -166,17 +166,18 @@ def check_name_keyboard(path, fm, kb_path):
 
 def main():
     variant = paths.cli("--variant") or paths.OPEN_VARIANT
-    if variant not in paths.PARTS_DIR:
-        sys.exit("--variant 只支持 %s" % " / ".join(paths.PARTS_DIR))
+    if variant not in paths.VARIANT_NAMES:
+        sys.exit("--variant 只支持 %s" % " / ".join(paths.VARIANT_NAMES))
     space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
-    fontres_path = dict(paths.font_parts(variant))["fontres.arc"]
+    paths.check_manifest(paths.parts_dir(variant, space), variant, space)
+    fontres_path = dict(paths.font_parts(variant, space))["fontres.arc"]
     fm = font_map(fontres_path)
     fc = set(fm)
     print("字库码位: %d（%s 变体 / %s 码位方案）" % (len(fc), variant, space))
     tot = collections.Counter()
     tot_missing = collections.Counter()
     msgs = 0
-    for name, path in paths.text_parts(variant):
+    for name, path in paths.text_parts(variant, space):
         r = scan(path, fc)
         if r is None or r.get("empty"):
             continue

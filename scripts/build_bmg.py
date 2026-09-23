@@ -287,5 +287,11 @@ def main():
             fh.write(yaz0.encode(raw))
         print("  %-14s %d 文件 -> %d 字节" % (base, len(spec["files"]), os.path.getsize(out)))
 
+    inputs = paths.inputs_of(TEXTS, paths.msg_index_json(),
+                             os.path.join(paths.DATA, "name_keyboard.json"),
+                             None if SPACE == paths.DEFAULT_CODE_SPACE else paths.sjis_map_json())
+    inputs.update(paths.inputs_of_dir(paths.source_dir()))
+    paths.write_manifest(OUT_DIR, paths.OPEN_VARIANT, SPACE, inputs=inputs)
+
 
 main()

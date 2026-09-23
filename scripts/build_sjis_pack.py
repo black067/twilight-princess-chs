@@ -131,15 +131,15 @@ def collect_images(meta):
     return out
 
 
-def overlay_entries(variant, region, language):
+def overlay_entries(variant, space, region, language):
     """资源 -> [(zip 内路径, 文件路径)]：字库写进 Font<region>，消息写进 Msg<language>。"""
-    fonts = paths.font_parts(variant)
+    fonts = paths.font_parts(variant, space)
     for name, path in fonts:
         if not os.path.exists(path):
             sys.exit("缺字库资源 %s：先跑 %s" % (path, FONT_STEP[variant]))
-    texts = paths.text_parts(variant)
+    texts = paths.text_parts(variant, space)
     if not texts:
-        sys.exit("缺文本资源：先跑 %s（%s）" % (TEXT_STEP[variant], paths.parts_dir(variant)))
+        sys.exit("缺文本资源：先跑 %s（%s）" % (TEXT_STEP[variant], paths.parts_dir(variant, space)))
     return ([("overlay/res/%s/%s" % (paths.font_dir(region), n), p) for n, p in fonts]
             + [("overlay/res/%s/%s" % (paths.msg_dir(language), n), p) for n, p in texts])
 
@@ -160,17 +160,17 @@ def add_file(z, path, arcname):
         add_bytes(z, arcname, f.read())
 
 
-def build(variant, meta, region, language, out_dir, check_only=False):
+def build(variant, space, meta, region, language, out_dir, check_only=False):
     """打一个变体在一个地区的包。"""
     meta = select_fields(meta, variant)
-    print("== %s：%s 变体 / %s 盘 ==" % (paths.lang(), variant, region))
+    print("== %s：%s 变体 / %s 码位方案 / %s 盘 ==" % (paths.lang(), variant, space, region))
     print_meta(meta)
     check_meta(meta)
     images = collect_images(meta)      # --check 也过一遍图片（存在性 + PNG 尺寸）
     if check_only:
         return None
 
-    files = sorted(overlay_entries(variant, region, language))
+    files = sorted(overlay_entries(variant, space, region, language))
     entries = [(arcname, src) for _, arcname, src in images] + files
     for key, arcname, _ in images:
         meta[key] = arcname             # manifest 里写包内路径
@@ -182,7 +182,7 @@ def build(variant, meta, region, language, out_dir, check_only=False):
         for arcname, path in entries:
             add_file(z, path, arcname)
     print("built %s  %d bytes  id=%s  字库资源来自 %s"
-          % (out, os.path.getsize(out), meta["id"], paths.PARTS_DIR[variant]))
+          % (out, os.path.getsize(out), meta["id"], paths.parts_name(variant, space)))
     for arcname, _ in entries:
         print("   %s" % arcname)
     return out
@@ -213,7 +213,9 @@ def main():
         sys.exit("mod id 重复（id 模板里要有 {region}）：%s" % ", ".join(dup))
 
     for variant, region, language, meta in jobs:
-        build(variant, meta, region, language, out_dir, check_only)
+        space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
+        paths.check_manifest(paths.parts_dir(variant, space), variant, space)
+        build(variant, space, meta, region, language, out_dir, check_only)
     if check_only:
         print("--check：只校验元数据，没写包")
     else:

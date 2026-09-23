@@ -3,6 +3,7 @@
 `config.default.json` 是固有打包参数，`config.local.json` 只写本机差异，`--xxx` 命令行再覆盖。
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -20,27 +21,34 @@ OPEN_VARIANT = "open"
 ORIGIN_VARIANT = "origin"
 # 两个成品变体：(变体名, config 里的元信息段)
 VARIANTS = ((OPEN_VARIANT, "mod"), (ORIGIN_VARIANT, "mod_origin"))
+VARIANT_NAMES = tuple(v for v, _ in VARIANTS)
 # 不带 --variant 时打的变体（其余变体要在命令行显式指定）
 PUBLISHED_VARIANTS = (OPEN_VARIANT,)
-# 资源目录（字库 + 文本）也在 work 下由这里定：一个变体一个目录，互不覆盖
-PARTS_DIR = {OPEN_VARIANT: "parts.open", ORIGIN_VARIANT: "parts.origin"}
+# 资源目录（字库 + 文本）在 work 下由这里定：origin 固定，open 按码位方案分（SCRATCH_DIR）
+ORIGIN_PARTS_DIR = "parts.origin"
 # 字库资源文件名：不带地区，同一个资源要写进各地区的 Font<region> 目录
 FONT_PART_NAMES = ("fontres.arc", "rubyres.arc")
 
 
-def parts_dir(variant):
-    """变体的资源目录（work/<lang>/ 下）：各出各的字库与文本，不互相覆盖。"""
-    return os.path.join(work_dir(), PARTS_DIR[variant])
+def parts_dir(variant, space=None):
+    """变体的资源目录（work/<lang>/ 下）：origin 固定，open 按码位方案分。"""
+    if variant == ORIGIN_VARIANT:
+        return os.path.join(work_dir(), ORIGIN_PARTS_DIR)
+    return scratch_dir(space or DEFAULT_CODE_SPACE)
 
 
-def font_parts(variant):
+def parts_name(variant, space=None):
+    return os.path.basename(parts_dir(variant, space))
+
+
+def font_parts(variant, space=None):
     """[(资源名, 路径)]：变体的两套字库资源。"""
-    return [(n, os.path.join(parts_dir(variant), n)) for n in FONT_PART_NAMES]
+    return [(n, os.path.join(parts_dir(variant, space), n)) for n in FONT_PART_NAMES]
 
 
-def text_parts(variant):
+def text_parts(variant, space=None):
     """[(资源名, 路径)]：变体自己那份文本资源（码位方案与它的字库配套）。"""
-    d = parts_dir(variant)
+    d = parts_dir(variant, space)
     if not os.path.isdir(d):
         return []
     return [(n, os.path.join(d, n)) for n in sorted(os.listdir(d)) if n.startswith("bmgres")]
@@ -368,3 +376,86 @@ def mod_meta(variant, region, language):
 def package_path(variant, region, language):
     """成品包路径：out 目录 / <转义 id>.dusk（id 带地区，文件名自然带地区后缀）。"""
     return os.path.join(out_dir(), escape_mod_id(mod_meta(variant, region, language)["id"]) + ".dusk")
+
+
+MANIFEST = "build.json"
+
+
+def sha256(path):
+    if not os.path.isfile(path):
+        return None
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def rel(path):
+    return os.path.relpath(path, ROOT).replace(os.sep, "/")
+
+
+def inputs_of(*paths_):
+    """{仓库内相对路径: sha256}：只记存在的文件；相对路径按仓库根解析。"""
+    out = {}
+    for path in paths_:
+        if not path:
+            continue
+        if not os.path.isabs(path):
+            path = os.path.join(ROOT, path)
+        digest = sha256(path)
+        if digest:
+            out[rel(path)] = digest
+    return out
+
+
+def inputs_of_dir(dirpath):
+    """{仓库内相对路径: sha256}：目录下第一层的每个文件。"""
+    if not os.path.isdir(dirpath):
+        return {}
+    return inputs_of(*[os.path.join(dirpath, n) for n in sorted(os.listdir(dirpath))
+                       if os.path.isfile(os.path.join(dirpath, n))])
+
+
+def write_manifest(dirpath, variant, space, inputs=None, params=None):
+    """把标识与输入哈希合并进 dirpath/build.json（同一目录多个生产者各写自己那些键）。"""
+    path = os.path.join(dirpath, MANIFEST)
+    doc = _load(path)
+    doc["lang"] = lang()
+    doc["variant"] = variant
+    doc["code_space"] = space
+    if params:
+        doc.setdefault("params", {}).update(params)
+    if inputs:
+        doc.setdefault("inputs", {}).update(inputs)
+    doc["inputs"] = dict(sorted((doc.get("inputs") or {}).items()))
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(doc, f, ensure_ascii=False, indent=1)
+        f.write("\n")
+    return path
+
+
+def check_manifest(dirpath, variant, space):
+    """按 build.json 复核标识与输入哈希；不符只提示不拦，返回是否全部对上。"""
+    path = os.path.join(dirpath, MANIFEST)
+    if not os.path.exists(path):
+        print("提示：%s 没有产物记录（缺 %s），无法核对它是哪一套" % (dirpath, MANIFEST),
+              file=sys.stderr)
+        return False
+    doc = _load(path)
+    ok = True
+    for key, want in (("lang", lang()), ("variant", variant), ("code_space", space)):
+        got = doc.get(key)
+        if got != want:
+            print("提示：%s/%s 记的 %s = %r，本次是 %r"
+                  % (os.path.basename(dirpath), MANIFEST, key, got, want), file=sys.stderr)
+            ok = False
+    for name, want in sorted((doc.get("inputs") or {}).items()):
+        got = sha256(os.path.join(ROOT, name))
+        if got is None:
+            print("提示：%s 记的输入已不在：%s" % (MANIFEST, name), file=sys.stderr)
+            ok = False
+        elif got != want:
+            print("提示：输入已改，产物可能过期：%s" % name, file=sys.stderr)
+            ok = False
+    return ok

@@ -104,15 +104,16 @@ def reverse_map(space):
 
 def main():
     variant = paths.cli("--variant") or paths.OPEN_VARIANT
-    if variant not in paths.PARTS_DIR:
-        sys.exit("--variant 只支持 %s" % " / ".join(paths.PARTS_DIR))
+    if variant not in paths.VARIANT_NAMES:
+        sys.exit("--variant 只支持 %s" % " / ".join(paths.VARIANT_NAMES))
     index, shapes = TR.load()
     # origin 的码位固定用 sjis 方案
     space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
     want = texts.read(texts.file(), texts.col_locale() if variant == paths.OPEN_VARIANT
                       else texts.col_draft())
     rev = reverse_map(space)
-    parts = paths.parts_dir(variant)
+    parts = paths.parts_dir(variant, space)
+    paths.check_manifest(parts, variant, space)
     print("变体 %s（%s 码位方案）：资源 %s，对照 %s" % (variant, space, parts, texts.file()))
 
     bad = []

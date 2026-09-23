@@ -273,6 +273,9 @@ def main():
             f.write(yaz0.encode(bytes(blob)))
         print("  %-14s entries=%-5d msgs=%-5d shrunk=%-5d exact=%-5d size %d"
               % (tail, nent, msgs, shrunk, exact, len(blob)))
+    inputs = paths.inputs_of(MAP_JSON)
+    inputs.update(paths.inputs_of_dir(paths.source_dir()))
+    paths.write_manifest(OUT_DIR, paths.ORIGIN_VARIANT, "sjis", inputs=inputs)
 
 
 if __name__ == "__main__":
