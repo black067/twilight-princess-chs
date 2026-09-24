@@ -87,7 +87,7 @@ def main():
     region, language = paths.pick_disc(paths.cli("--region"))
     src = paths.package_path(variant, region, language)
     if not os.path.exists(src):
-        sys.exit("找不到成品包：%s（先跑 build_sjis_pack.py）" % src)
+        sys.exit("找不到成品包：%s（先跑 build_pack.py）" % src)
 
     dst = os.path.join(mods_dir, os.path.basename(src))
     os.makedirs(mods_dir, exist_ok=True)
