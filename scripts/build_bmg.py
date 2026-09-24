@@ -25,7 +25,7 @@ import yaz0
 CODE_JSON = paths.code_map_json()
 ENCODING = 3
 
-TEXTS = paths.cli("--texts") or texts.file()
+TEXTS = paths.cli("--texts") or texts.locale_file()
 SPACE = paths.code_space()                     # own=自分配码位；sjis=沿用现有字库的码位
 OUT_DIR = paths.scratch_dir(SPACE)
 

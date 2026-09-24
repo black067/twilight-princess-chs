@@ -167,16 +167,10 @@ def config_value(key, default=None):
     return default if value is None else value
 
 
-def config_dir(key, default):
-    """取配置里的目录：相对路径按仓库根解析。"""
-    value = config_value(key) or default
-    return value if os.path.isabs(value) else os.path.join(ROOT, value)
-
-
 def _langs():
     langs = config_value("langs")
     if not isinstance(langs, dict) or not langs:
-        sys.exit("%s 里缺 langs（每个语言一段：source / draft_col / locale_col / discs / mod）"
+        sys.exit("%s 里缺 langs（每个语言一段：source / src_file / src_col / locale_file / locale_col / discs / mod）"
                  % CONFIG_DEFAULT)
     return langs
 
@@ -219,26 +213,39 @@ def source_dir():
 
 
 def input_dir():
-    """本地素材根（顶层 input_dir，缺省 input）：消息库、参照字库、译文表都在它下面。"""
+    """本地素材根（顶层 input_dir，缺省 input）：消息库、参照字库都在它下面。"""
     value = config_value("input_dir") or "input"
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
-def texts_file():
-    """译文表：<input_dir>/texts.<lang>.csv（与素材放在一起）。"""
-    return os.path.join(input_dir(), "texts.%s.csv" % lang())
-
-
-def _col(key):
+def _text_path(key, name):
+    """表路径：langs.<lang>.<key> 优先（相对路径按仓库根解析），缺省 <input_dir>/<name>。"""
     value = lang_value(key)
+    if not value:
+        return os.path.join(input_dir(), name)
+    return value if os.path.isabs(value) else os.path.join(ROOT, value)
+
+
+def locale_file():
+    """译文表（打包只读它），缺省 <input_dir>/texts.<lang>.csv。"""
+    return _text_path("locale_file", "texts.%s.csv" % lang())
+
+
+def src_file():
+    """原文表（校对底本），缺省 <input_dir>/texts.<lang>.src.csv。"""
+    return _text_path("src_file", "texts.%s.src.csv" % lang())
+
+
+def _col(key, default=None):
+    value = lang_value(key) or default
     if not value:
         sys.exit("%s 的 langs.%s 里缺少 %s (列名)" % (CONFIG_DEFAULT, lang(), key))
     return value
 
 
-def draft_col():
-    """底稿列（导出时从素材读出来的原文）。"""
-    return _col("draft_col")
+def src_col():
+    """原文列（导出写它、origin 校验读它）。"""
+    return _col("src_col", "src")
 
 
 def locale_col():

@@ -11,7 +11,8 @@
     "langs": {
         "zh-Hans": {
             "source": "input/msg",
-            "draft_col": "cn",
+            "src_file": "input/texts.zh-Hans.src.csv",
+            "src_col": "cn",
             "locale_col": "zh-Hans",
             "default_name_chars": "林克伊波娜",
             "default_name_cells": [ "zel_00/898", "zel_00/899" ],
@@ -23,7 +24,7 @@
             "mod": {
                 "id": "yiga.zh.hans.{region}",
                 "name": "Chinese (Simplified) Translation",
-                "version": "1.0.0",
+                "version": "1.0.2",
                 "author": "Yiga Clan",
                 "description": "A Chinese (Simplified) translation mod",
                 "icon": "assets/icon.png",
@@ -32,7 +33,7 @@
             "mod_origin": {
                 "id": "orig.zh.hans.{region}",
                 "name": "Chinese (Simplified) Translation (bitmap font)",
-                "version": "1.0.0",
+                "version": "1.0.2",
                 "author": "Yiga Clan",
                 "description": "A Chinese (Simplified) translation mod",
                 "icon": "assets/icon.png",
@@ -41,7 +42,9 @@
         },
         "cn": {
             "source": "input/msg_us",
-            "draft_col": "en",
+            "src_file": "input/texts.cn.src.csv",
+            "src_col": "en",
+            "locale_file": "data/texts.cn.csv",
             "locale_col": "cn",
             "default_name_chars": "林克伊波娜",
             "default_name_cells": [ "zel_00/898", "zel_00/899" ],
@@ -53,7 +56,7 @@
             "mod": {
                 "id": "yiga.cn.{region}",
                 "name": "Chinese Translation (DeepSeek Ver)",
-                "version": "1.0.0",
+                "version": "1.0.2",
                 "author": "Yiga Clan",
                 "description": "Chinese translation translated from English (US) text by an AI.",
                 "icon": "assets/icon.png",
@@ -62,7 +65,8 @@
         },
         "en": {
             "source": "input/msg_us",
-            "draft_col": "en",
+            "src_file": "input/texts.en.csv",
+            "src_col": "en",
             "locale_col": "en",
             "discs": [
                 { "region": "us", "language": "us" }

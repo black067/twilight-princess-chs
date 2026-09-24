@@ -3,7 +3,6 @@
 只统计改现成素材会重建的条目（`messages` 类型的消息表）；单位表是照原样写进的，不算在内。
 """
 
-import csv
 import os
 import struct
 import sys
@@ -63,14 +62,12 @@ def main():
     index, shapes = TR.load()
     messages = {key for _, _, _, shape, key in TR.cells(index, shapes) if shape["shape"] == "messages"}
     counts = {}
-    with open(texts.file(), encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f)
-        for rec in reader:
-            if rec[texts.COL_KEY] not in messages:
-                continue
-            for tok in texts.parse_literal(rec[texts.col_locale()]):
-                if tok[0] == "chr":
-                    counts[tok[1]] = counts.get(tok[1], 0) + 1
+    for key, literal in texts.read(texts.locale_file(), texts.col_locale()).items():
+        if key not in messages:
+            continue
+        for tok in texts.parse_literal(literal):
+            if tok[0] == "chr":
+                counts[tok[1]] = counts.get(tok[1], 0) + 1
 
     total = sum(counts.values())
     distinct = len(counts)

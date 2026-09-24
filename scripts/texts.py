@@ -1,6 +1,6 @@
-"""texts.<lang>.csv 的读写：一行 = 一条文本。
+"""文本表的读写：一行 = 一条文本。
 
-只认 `key` 与本地化方案指定的两个文本列，其余列不参与打包。
+只认 `key` 与本地化方案指定的那一列（原文表读 src_col，译文表读 locale_col），其余列不参与。
 """
 
 import csv
@@ -13,16 +13,20 @@ COL_KEY = "key"
 TAG_RE = re.compile(r"<T([0-9a-f]{6})(?::([0-9a-f]*))?>")
 
 
-def file():
-    return paths.texts_file()
+def locale_file():
+    return paths.locale_file()
+
+
+def src_file():
+    return paths.src_file()
 
 
 def col_locale():
     return paths.locale_col()
 
 
-def col_draft():
-    return paths.draft_col()
+def col_src():
+    return paths.src_col()
 
 
 def format_tokens(tokens):
@@ -83,7 +87,7 @@ def parse_literal(literal):
 
 def read(path=None, locale=None):
     """读 CSV -> {key: 字面串}。表头缺列、key 重复、行与表头列数不符都直接报错。"""
-    path = path or file()
+    path = path or locale_file()
     locale = locale or col_locale()
     if not os.path.exists(path):
         raise SystemExit("缺 %s（用 export_texts.py 从素材导出）" % path)

@@ -1,6 +1,6 @@
-"""从本地化方案的 source 目录导出译文表 <input_dir>/texts.<lang>.csv。
+"""从本地化方案的 source 目录导出原文表（校对底本）：只写字面原文，不碰译文表。
 
-**整表重写**：译文列与底稿列都写入源素材原文，要保留的译文先备份。
+表路径 = langs.<lang>.src_file，缺省 <input_dir>/texts.<lang>.src.csv，**整表重写**。
 """
 
 import os
@@ -62,12 +62,11 @@ def main():
 
     rows = []
     for base, f, resource, shape, key in TR.cells(index, shapes):
-        literal = literals[key]
-        rows.append([key, literal, literal, ""])
+        rows.append([key, literals[key], ""])
 
-    path = texts.file()
-    texts.write(path, (texts.COL_KEY, texts.col_draft(), texts.col_locale(), COL_COMMENT), rows)
-    print("导出 %d 行（%s）-> %s" % (len(rows), paths.lang(), path))
+    path = texts.src_file()
+    texts.write(path, (texts.COL_KEY, texts.col_src(), COL_COMMENT), rows)
+    print("导出原文 %d 行（%s）-> %s" % (len(rows), paths.lang(), path))
     print("  资源 %d 个：%s" % (len(shapes), " ".join(sorted(shapes))))
 
 

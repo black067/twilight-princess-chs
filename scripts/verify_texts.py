@@ -109,12 +109,13 @@ def main():
     index, shapes = TR.load()
     # origin 的码位固定用 sjis 方案
     space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
-    want = texts.read(texts.file(), texts.col_locale() if variant == paths.OPEN_VARIANT
-                      else texts.col_draft())
+    table = (texts.locale_file(), texts.col_locale()) if variant == paths.OPEN_VARIANT \
+        else (texts.src_file(), texts.col_src())
+    want = texts.read(*table)
     rev = reverse_map(space)
     parts = paths.parts_dir(variant, space)
     paths.check_manifest(parts, variant, space)
-    print("变体 %s（%s 码位方案）：资源 %s，对照 %s" % (variant, space, parts, texts.file()))
+    print("变体 %s（%s 码位方案）：资源 %s，对照 %s" % (variant, space, parts, table[0]))
 
     bad = []
     total = 0
