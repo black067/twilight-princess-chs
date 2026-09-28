@@ -243,7 +243,7 @@ def main():
     params = {}
     if source != "original":
         fonts = {}
-        for part in ("fontres", "rubyres"):
+        for part in paths.FONT_KEYS:
             ttf, em, gamma = font_settings(part, cli_ttf, cli_em)
             fonts[part] = {"file": ttf, "em": em, "gamma": gamma}
         inputs.update(paths.inputs_of(*[v["file"] for v in fonts.values()]))

@@ -32,8 +32,6 @@ BLANK_SLOT = ASCII_HI - ASCII_LO        # 0x7F（DEL，不渲染）= 通用空�
 # (ascent, descent, width, leading)：与游戏排版对齐的度量，config 的 fonts.<name> 可覆盖。
 # width 同时是全角前进宽度（引擎的 getWidth() / WID1 单位 = 格宽的 1/48）
 DEFAULT_METRICS = {"fontres": (42, 6, 42, 48), "rubyres": (43, 5, 48, 48)}
-# 资源名 -> 引擎按名字取的 BFN 名（mDoExt_initFont0/1 里写死）
-FONTS = (("fontres", "rodan_b_24_22.bfn"), ("rubyres", "reishotai_24_22.bfn"))
 
 # 引擎把半角 ASCII 转成全角码位时用的表（`JUTResFont::getFontCode` 里的同名字表）。
 # 把这些码位也指到 ASCII 字形上，免得哪条路径先转过就查不到字形。
@@ -289,7 +287,7 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     tables = {}
     font_inputs, font_params = [], {}
-    for part, inner in FONTS:
+    for part, arc_name, inner in paths.FONT_PARTS:
         ttf, em, gamma = PSF.font_settings(part, CLI_TTF, CLI_EM)
         if not ttf or not os.path.exists(ttf):
             sys.exit("缺字体文件：config 的 fonts.%s.file（或 --ttf <路径>）" % part)
@@ -330,12 +328,12 @@ def main():
         w.add(inner, bfn)
         raw = w.build()
         self_check(raw, inner, code_slots, fields, wid, kb)
-        path = os.path.join(OUT_DIR, part + ".arc")
+        path = os.path.join(OUT_DIR, arc_name)
         with open(path, "wb") as f:
             f.write(yaz0.encode(raw))
         print("   wrote %s (BFN %d 字节 -> 归档 %d 字节 -> yaz0 %d 字节)"
               % (path, len(bfn), len(raw), os.path.getsize(path)))
-        if part == "fontres":
+        if part == paths.MAIN_FONT:
             tables[part] = {
                 "aliases": [["%04X" % c, "%04X" % slots[c]] for c in kb],
                 "new_chars": {"%04X" % slots[c]: char for c, char in kb_chars},

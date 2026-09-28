@@ -130,8 +130,8 @@ def check_name_keyboard(path, fm, kb_path):
         return
     with open(kb_path, encoding="utf-8") as f:
         doc = json.load(f)
-    t = doc.get("fontres")
-    assert t, "keyboard_aliases.json 缺 fontres 表"
+    t = doc.get(paths.MAIN_FONT)
+    assert t, "keyboard_aliases.json 缺 %s 表" % paths.MAIN_FONT
     bad = []
     for code_s, idx_s in t["aliases"]:
         code, idx = int(code_s, 16), int(idx_s, 16)
@@ -170,8 +170,8 @@ def main():
         sys.exit("--variant 只支持 %s" % " / ".join(paths.VARIANT_NAMES))
     space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
     paths.check_manifest(paths.parts_dir(variant, space), variant, space)
-    fontres_path = dict(paths.font_parts(variant, space))["fontres.arc"]
-    fm = font_map(fontres_path)
+    main_font_path = paths.font_part(paths.MAIN_FONT, variant, space)
+    fm = font_map(main_font_path)
     fc = set(fm)
     print("字库码位: %d（%s 变体 / %s 码位方案）" % (len(fc), variant, space))
     tot = collections.Counter()
@@ -193,7 +193,7 @@ def main():
         print("   缺字码位 %04X x%-5d %s" % (c, n, chr(c) if 0x20 < c < 0xFFFF else "?"))
     print()
     if variant == paths.OPEN_VARIANT:
-        check_name_keyboard(fontres_path, fm, paths.kb_json(space))
+        check_name_keyboard(main_font_path, fm, paths.kb_json(space))
     else:
         print("名字键盘: 跳过（键盘补全只对 %s 变体成立）" % paths.OPEN_VARIANT)
 

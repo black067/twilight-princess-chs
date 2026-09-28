@@ -9,6 +9,7 @@ sys.path.insert(0, SCRIPTS)
 
 import bfn_repack as R
 import material
+import paths
 
 
 def hexline(d, off, n):
@@ -17,7 +18,7 @@ def hexline(d, off, n):
 
 def main():
     arcs = material.font_arcs()
-    for name in ("fontres.arc", "rubyres.arc"):
+    for name in paths.FONT_PART_NAMES:
         arc = arcs[name]
         start, bfn, blocks = R.parse_bfn(arc)
         print("== %s  arc=%d  bfn@%#x size=%d" % (name, len(arc), start, len(bfn)))

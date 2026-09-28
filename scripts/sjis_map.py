@@ -99,7 +99,7 @@ def font_map1(bfn):
 
 
 def main():
-    arc = material.font_arcs()["fontres.arc"]
+    arc = material.font_arcs()[paths.FONT_ARC_NAMES[paths.MAIN_FONT]]
     start, body, blocks = R.parse_bfn(arc)
     entries_map = font_map1(body)
     print("font MAP1 method3 entries: %d" % len(entries_map))

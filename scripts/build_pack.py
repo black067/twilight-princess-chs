@@ -160,7 +160,7 @@ def add_file(z, path, arcname):
         add_bytes(z, arcname, f.read())
 
 
-def build(variant, space, meta, region, language, out_dir, check_only=False):
+def build(variant, space, meta, region, language, check_only=False):
     """打一个变体在一个地区的包。"""
     meta = select_fields(meta, variant)
     print("== %s：%s 变体 / %s 码位方案 / %s 盘 ==" % (paths.lang(), variant, space, region))
@@ -175,7 +175,7 @@ def build(variant, space, meta, region, language, out_dir, check_only=False):
     for key, arcname, _ in images:
         meta[key] = arcname             # manifest 里写包内路径
 
-    out = os.path.join(out_dir, paths.escape_mod_id(meta["id"]) + ".dusk")
+    out = paths.package_path(variant, region, language)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         # 字节格式：2 空格缩进、字段顺序 id→…→banner、末尾不留换行、UTF-8 无 BOM
         add_bytes(z, "mod.json", json.dumps(meta, indent=2, ensure_ascii=False).encode("utf-8"))
@@ -204,8 +204,7 @@ def main():
         variants = [v for v in variants if v in paths.PUBLISHED_VARIANTS]
         print("只打 %s（其余用 --variant 指定）" % " / ".join(variants))
 
-    out_dir = paths.out_dir()
-    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(paths.out_dir(), exist_ok=True)
     jobs = [(v, r, l, paths.mod_meta(v, r, l)) for r, l in discs for v in variants]
     ids = [m["id"] for *_, m in jobs]
     dup = sorted({i for i in ids if ids.count(i) > 1})
@@ -215,7 +214,7 @@ def main():
     for variant, region, language, meta in jobs:
         space = paths.code_space() if variant == paths.OPEN_VARIANT else "sjis"
         paths.check_manifest(paths.parts_dir(variant, space), variant, space)
-        build(variant, space, meta, region, language, out_dir, check_only)
+        build(variant, space, meta, region, language, check_only)
     if check_only:
         print("--check：只校验元数据，没写包")
     else:

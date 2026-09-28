@@ -26,8 +26,18 @@ VARIANT_NAMES = tuple(v for v, _ in VARIANTS)
 PUBLISHED_VARIANTS = (OPEN_VARIANT,)
 # 资源目录（字库 + 文本）在 work 下由这里定：origin 固定，open 按码位方案分（SCRATCH_DIR）
 ORIGIN_PARTS_DIR = "parts.origin"
-# 字库资源文件名：不带地区，同一个资源要写进各地区的 Font<region> 目录
-FONT_PART_NAMES = ("fontres.arc", "rubyres.arc")
+# 两套字库：配置键名 / 归档资源名 / 归档内 BFN 名（引擎按 BFN 名取，mDoExt_initFont0 / initFont1）；
+# 资源名不带地区，同一个资源要写进各地区的 Font<region> 目录
+FONT_PARTS = (
+    ("fontres", "fontres.arc", "rodan_b_24_22.bfn"),
+    ("rubyres", "rubyres.arc", "reishotai_24_22.bfn"),
+)
+FONT_KEYS = tuple(key for key, _arc, _inner in FONT_PARTS)
+FONT_ARC_NAMES = {key: arc for key, arc, _inner in FONT_PARTS}
+FONT_INNER_NAMES = {key: inner for key, _arc, inner in FONT_PARTS}
+FONT_PART_NAMES = tuple(FONT_ARC_NAMES[key] for key in FONT_KEYS)
+# 主字库：画对话正文、菜单、栏位文字；键盘别名表也以它为键
+MAIN_FONT = FONT_KEYS[0]
 
 
 def parts_dir(variant, space=None):
@@ -41,9 +51,14 @@ def parts_name(variant, space=None):
     return os.path.basename(parts_dir(variant, space))
 
 
+def font_part(key, variant, space=None):
+    """该变体资源目录里某套字库的路径。"""
+    return os.path.join(parts_dir(variant, space), FONT_ARC_NAMES[key])
+
+
 def font_parts(variant, space=None):
     """[(资源名, 路径)]：变体的两套字库资源。"""
-    return [(n, os.path.join(parts_dir(variant, space), n)) for n in FONT_PART_NAMES]
+    return [(FONT_ARC_NAMES[key], font_part(key, variant, space)) for key in FONT_KEYS]
 
 
 def text_parts(variant, space=None):

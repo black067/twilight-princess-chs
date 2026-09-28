@@ -15,7 +15,7 @@ import paths
 import text_resources as TR
 import texts
 
-FONT = os.path.join(paths.font_source_dir(), "rodan_b_24_22.bfn")
+FONT = os.path.join(paths.font_source_dir(), paths.FONT_INNER_NAMES[paths.MAIN_FONT])
 
 
 def load_maps(bfn):

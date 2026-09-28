@@ -632,7 +632,7 @@ def _repacked(arc):
 
 
 def main():
-    font_name = _arg("--font", "fontres")
+    font_name = _arg("--font", paths.MAIN_FONT)
     ttf = _arg("--ttf")
     em = float(_arg("--em", DEFAULT_EM))
     gamma = float(_arg("--gamma", DEFAULT_GAMMA))
