@@ -82,10 +82,7 @@ def msg_index_json():
 
 def font_source_dir():
     """参照字库目录（本地化方案的 font_source，缺省 <input_dir>/font）。"""
-    value = lang_value("font_source")
-    if not value:
-        return os.path.join(input_dir(), "font")
-    return value if os.path.isabs(value) else os.path.join(ROOT, value)
+    return lang_path("font_source") or os.path.join(input_dir(), "font")
 
 
 # 命令行参数 -> 配置字段
@@ -197,6 +194,14 @@ def lang_config():
 def lang_value(key, default=None):
     value = lang_config().get(key)
     return default if value is None else value
+
+
+def lang_path(key):
+    """本地化方案里的路径项（相对路径按仓库根解析）；没配返回 None。"""
+    value = lang_value(key)
+    if not value:
+        return None
+    return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
 def work_dir():

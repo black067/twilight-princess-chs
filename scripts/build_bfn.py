@@ -54,14 +54,9 @@ CLI_TTF = paths.option("--ttf")
 CLI_EM = paths.option("--em")
 
 
-def keyboard_codes():
-    """引擎名字键盘的 550 个码位。"""
-    with open(os.path.join(paths.DATA, "name_keyboard.json"), encoding="utf-8") as f:
-        return [int(c, 16) for c in json.load(f)["codes"]]
-
-
-def sjis_char(code):
-    return bytes((code >> 8, code & 0xFF)).decode("shift_jis")
+def keyboard_chars():
+    """[(码位, 待渲染字符)]：引擎名字键盘的 550 格（本地化方案可用 keyboard_glyphs 改画字形）。"""
+    return codes.keyboard_chars(paths.DATA, paths.lang_path("keyboard_glyphs"))
 
 
 def code_chars():
@@ -70,8 +65,8 @@ def code_chars():
     fixed = {}
     for code, ch in PSF.ICON_ALIAS.items():
         fixed[code] = chr(ch)
-    for code in keyboard_codes():
-        fixed[code] = sjis_char(code)
+    for code, char in keyboard_chars():
+        fixed[code] = char
     for code in PSF.PAL_KEY_CODES:
         fixed[code] = PSF.PAL_KEY_CHAR.get(code, chr(code))
     for i, ch in enumerate(PSF.name_default_chars()):
@@ -281,7 +276,8 @@ def main():
     pairs = code_chars()
     slots, total = slots_of(pairs)
     roster = roster_of(slots, pairs)
-    kb = keyboard_codes()
+    kb_chars = keyboard_chars()
+    kb = [code for code, _ in kb_chars]
     code_slots = dict(slots)
     code_slots.update(halfwidth_aliases(slots))      # 全角 ASCII 码位也指到 ASCII 字形
     cells = ROWS * (-(-total // ROWS))
@@ -342,7 +338,7 @@ def main():
         if part == "fontres":
             tables[part] = {
                 "aliases": [["%04X" % c, "%04X" % slots[c]] for c in kb],
-                "new_chars": {"%04X" % slots[c]: sjis_char(c) for c in kb},
+                "new_chars": {"%04X" % slots[c]: char for c, char in kb_chars},
                 "direct": 0, "variant": 0, "added": len(kb), "blanked": 0,
                 "pal": {
                     "aliases": [["%04X" % c, "%04X" % slots[c]] for c in PSF.PAL_KEY_CODES],

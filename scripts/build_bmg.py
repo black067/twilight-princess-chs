@@ -242,13 +242,8 @@ def main():
     for ch in PSF.name_default_chars():
         need(ch)
     need(chr(PST.REFMARK_CHAR))
-    with open(os.path.join(paths.DATA, "name_keyboard.json"), encoding="utf-8") as f:
-        for c in json.load(f)["codes"]:
-            code = int(c, 16)
-            try:
-                need(bytes((code >> 8, code & 0xFF)).decode("shift_jis"))
-            except UnicodeDecodeError:
-                pass
+    for _code, char in codes.keyboard_chars(paths.DATA, paths.lang_path("keyboard_glyphs")):
+        need(char)
 
     mapping = codes.assign(chars, codes.reserved(paths.DATA))
     codes.save(CODE_JSON, mapping, "译文与控制字符 -> 新码位（%d 个）" % len(mapping))

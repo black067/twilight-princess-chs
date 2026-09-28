@@ -12,10 +12,32 @@ RANGES = ((0xEAA5, 0xEFFC), (0xF040, 0xF9FC))
 TRAIL_LO, TRAIL_HI = 0x40, 0xFC
 
 
+def name_keyboard_codes(data_dir):
+    """引擎名字键盘的码位表（`data/name_keyboard.json`）。"""
+    with open(os.path.join(data_dir, "name_keyboard.json"), encoding="utf-8") as f:
+        return [int(c, 16) for c in json.load(f)["codes"]]
+
+
+def keyboard_chars(data_dir, glyphs=None):
+    """[(码位, 待渲染字符)]：键盘每格要画的字符。
+
+    `glyphs` 是本地化方案 `keyboard_glyphs` 指的表（码位 -> 改画成什么字符）；
+    不给就按码位解 ShiftJIS。
+    """
+    override = {}
+    if glyphs:
+        with open(glyphs, encoding="utf-8") as f:
+            override = {int(k, 16): v for k, v in json.load(f)["chars"].items()}
+    out = []
+    for code in name_keyboard_codes(data_dir):
+        char = bytes((code >> 8, code & 0xFF)).decode("shift_jis")
+        out.append((code, override.get(code, char)))
+    return out
+
+
 def reserved(data_dir):
     """引擎自己会查的码位（名字键盘 `l_mojiZh` 的表）：不能分给译文。"""
-    with open(os.path.join(data_dir, "name_keyboard.json"), encoding="utf-8") as f:
-        return {int(c, 16) for c in json.load(f)["codes"]}
+    return set(name_keyboard_codes(data_dir))
 
 
 def is_ok(code, skip=()):

@@ -40,6 +40,32 @@
                 "banner": "assets/banner.png"
             }
         },
+        "zh-Hant": {
+            "source": "input/msg",
+            "src_file": "input/texts.zh-Hant.src.csv",
+            "src_col": "cn",
+            "locale_col": "zh-Hant",
+            "keyboard_glyphs": "data/keyboard_glyphs.zh-Hant.json",
+            "default_name_chars": "林克伊波娜",
+            "default_name_cells": [ "zel_00/898", "zel_00/899" ],
+            "fonts": {
+                "fontres": { "file": "work/fonts/NotoSansCJKtc-Regular.otf" }
+            },
+            "discs": [
+                { "region": "us", "language": "us" },
+                { "region": "eu", "language": "fr" },
+                { "region": "jp", "language": "jp" }
+            ],
+            "mod": {
+                "id": "yiga.zh.hant.{region}",
+                "name": "Chinese (Traditional) Translation",
+                "version": "1.0.0",
+                "author": "Yiga Clan",
+                "description": "A Chinese (Traditional) translation mod",
+                "icon": "assets/icon.png",
+                "banner": "assets/banner.png"
+            }
+        },
         "cn": {
             "source": "input/msg_us",
             "src_file": "input/texts.cn.src.csv",
