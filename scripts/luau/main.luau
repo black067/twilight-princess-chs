@@ -107,6 +107,8 @@ locales_var:subscribe(reapply)
 
 ui.register_mods_panel({
     build = function(panel)
+        panel:add_text(opts.ui.hint)
+
         local labels = {}
         for _, item in ipairs(opts.translations) do
             table.insert(labels, item.label)
@@ -147,8 +149,6 @@ ui.register_mods_panel({
                 end,
             })
         end
-
-        panel:add_text(opts.ui.hint)
     end,
 })
 

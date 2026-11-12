@@ -39,7 +39,7 @@
         "ui": {
             "label_translation": "Translation",
             "section_locale": "Game language",
-            "hint": "Text applies on the next load. Fonts need a game restart."
+            "hint": "Restart dusklight after changing these settings."
         }
     },
 
