@@ -82,7 +82,7 @@
             "mod": {
                 "id": "yiga.cn.{region}",
                 "name": "Chinese Translation (DeepSeek Ver)",
-                "version": "1.0.2",
+                "version": "1.0.3",
                 "author": "Yiga Clan",
                 "description": "Chinese translation translated from English (US) text by an AI.",
                 "icon": "assets/icon.png",
