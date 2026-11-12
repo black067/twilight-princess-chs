@@ -6,8 +6,11 @@
 
 **假定你已经准备好了 dusklight 以及可以游玩的镜像**
 
-1. 下载本 mod 的包：[twilitrealm.dev mod 站](https://twilitrealm.dev/mods/) 或 [GitHub Releases](https://github.com/black067/twilight-princess-chs/releases)（美版 / 欧版 / 日版各一份，按你的版本下）
+1. 下载本 mod 的包：[twilitrealm.dev mod 站](https://twilitrealm.dev/mods/) 或 [GitHub Releases](https://github.com/black067/twilight-princess-chs/releases)（一份包通吃 GC / Wii 各区镜像）
 2. 把 `<id>.dusk` 放进引擎的 mods 目录（dusklight 2.x 是 exe 同级的 `mods/`）
+3. 在 dusklight 的 Mods 窗口里选中本 mod，在 `Game language` 里勾上你游戏设置里用的语言；译文在 `Translation` 下拉里选
+
+> 改完重启 dusklight 确保生效。
 
 > 自己做一份本地化 mod 的步骤见 [构建指南](docs/构建指南.md)。
 

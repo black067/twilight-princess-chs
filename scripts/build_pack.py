@@ -39,7 +39,7 @@ def select_fields(meta, variant):
     return {key: meta[key] for key in TEXT_FIELDS + tuple(IMAGE_FIELDS) if key in meta}
 
 
-def check_meta(meta):
+def check_meta(meta, sections=None):
     """本地闸门：站点会拒的问题挡在打包之前，其余只提示（站点只回一句笼统报错）。"""
     problems, warnings = [], []
 
@@ -77,8 +77,8 @@ def check_meta(meta):
     if problems:
         for line in problems:
             print("  - %s" % line, file=sys.stderr)
-        sys.exit("元数据没通过本地校验：改 %s 里的 %s"
-                 % (paths.CONFIG_DEFAULT, " / ".join(key for _, key in paths.VARIANTS)))
+        where = sections or [key for _, key in paths.VARIANTS]
+        sys.exit("元数据没通过本地校验：改 %s 里的 %s" % (paths.CONFIG_DEFAULT, " / ".join(where)))
 
 
 def print_meta(meta):
@@ -221,4 +221,5 @@ def main():
         print("上传前手工项：Category / License / Source URL / 截图 / changelog（站点后台填）")
 
 
-main()
+if __name__ == "__main__":
+    main()

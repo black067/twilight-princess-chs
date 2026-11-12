@@ -40,30 +40,30 @@ FONT_PART_NAMES = tuple(FONT_ARC_NAMES[key] for key in FONT_KEYS)
 MAIN_FONT = FONT_KEYS[0]
 
 
-def parts_dir(variant, space=None):
+def parts_dir(variant, space=None, name=None):
     """变体的资源目录（work/<lang>/ 下）：origin 固定，open 按码位方案分。"""
     if variant == ORIGIN_VARIANT:
-        return os.path.join(work_dir(), ORIGIN_PARTS_DIR)
-    return scratch_dir(space or DEFAULT_CODE_SPACE)
+        return os.path.join(work_dir(name), ORIGIN_PARTS_DIR)
+    return scratch_dir(space or DEFAULT_CODE_SPACE, name)
 
 
-def parts_name(variant, space=None):
-    return os.path.basename(parts_dir(variant, space))
+def parts_name(variant, space=None, name=None):
+    return os.path.basename(parts_dir(variant, space, name))
 
 
-def font_part(key, variant, space=None):
+def font_part(key, variant, space=None, name=None):
     """该变体资源目录里某套字库的路径。"""
-    return os.path.join(parts_dir(variant, space), FONT_ARC_NAMES[key])
+    return os.path.join(parts_dir(variant, space, name), FONT_ARC_NAMES[key])
 
 
-def font_parts(variant, space=None):
+def font_parts(variant, space=None, name=None):
     """[(资源名, 路径)]：变体的两套字库资源。"""
-    return [(FONT_ARC_NAMES[key], font_part(key, variant, space)) for key in FONT_KEYS]
+    return [(FONT_ARC_NAMES[key], font_part(key, variant, space, name)) for key in FONT_KEYS]
 
 
-def text_parts(variant, space=None):
+def text_parts(variant, space=None, name=None):
     """[(资源名, 路径)]：变体自己那份文本资源（码位方案与它的字库配套）。"""
-    d = parts_dir(variant, space)
+    d = parts_dir(variant, space, name)
     if not os.path.isdir(d):
         return []
     return [(n, os.path.join(d, n)) for n in sorted(os.listdir(d)) if n.startswith("bmgres")]
@@ -75,12 +75,12 @@ SCRATCH_DIR = {"own": "parts.open.own", "sjis": "parts.open.sjis"}
 KB_JSON = {"own": "keyboard_aliases.json", "sjis": "keyboard_aliases.sjis.json"}
 
 
-def scratch_dir(space=DEFAULT_CODE_SPACE):
-    return os.path.join(work_dir(), SCRATCH_DIR[space])
+def scratch_dir(space=DEFAULT_CODE_SPACE, name=None):
+    return os.path.join(work_dir(name), SCRATCH_DIR[space])
 
 
-def kb_json(space=DEFAULT_CODE_SPACE):
-    return os.path.join(work_dir(), KB_JSON[space])
+def kb_json(space=DEFAULT_CODE_SPACE, name=None):
+    return os.path.join(work_dir(name), KB_JSON[space])
 
 
 def code_map_json():
@@ -110,8 +110,6 @@ KEYS = {
 
 # 替换目录：字库目录跟 region（Font<region>），消息目录跟 language（Msg<language>）
 REGIONS = ("us", "eu", "jp")
-LANGUAGES = ("uk", "us", "de", "fr", "sp", "it", "jp")
-LANG_REGION = {"uk": "eu", "de": "eu", "fr": "eu", "sp": "eu", "it": "eu", "jp": "jp"}
 # 元信息占位符 {region} / {language} 的展开（写给玩家看）
 SLOT_NAMES = {
     "region": {"us": "United States", "eu": "Europe", "jp": "Japan"},
@@ -179,6 +177,44 @@ def config_value(key, default=None):
     return default if value is None else value
 
 
+def bundle_config():
+    """合并包的配置段（顶层的 bundle）。"""
+    value = _config().get("bundle")
+    return value if isinstance(value, dict) else {}
+
+
+def bundle_value(key, default=None):
+    value = bundle_config().get(key)
+    return default if value is None else value
+
+
+def locales():
+    """[(code, label, region)]：游戏内语言列表，配在 bundle.locales。"""
+    raw = bundle_value("locales")
+    if not isinstance(raw, list) or not raw:
+        sys.exit("%s 里缺 bundle.locales（每个语言一项 {code, label, region}）" % CONFIG_DEFAULT)
+    out = []
+    for item in raw:
+        item = item or {}
+        code = str(item.get("code") or "").lower()
+        label = str(item.get("label") or "")
+        region = str(item.get("region") or "").lower()
+        if not code or not label:
+            sys.exit("bundle.locales 有一项缺 code 或 label：%r" % (item,))
+        if region and region not in REGIONS:
+            sys.exit("bundle.locales 里 %s 的 region 无效：%r" % (code, region))
+        out.append((code, label, region))
+    return out
+
+
+def locale_codes():
+    return [code for code, _label, _region in locales()]
+
+
+def locale_region():
+    return {code: region for code, _label, region in locales() if region}
+
+
 def _langs():
     langs = config_value("langs")
     if not isinstance(langs, dict) or not langs:
@@ -201,34 +237,34 @@ def lang():
     return name
 
 
-def lang_config():
-    """当前语言的全量配置：本地化方案递归覆盖顶层（顶层 fonts 是默认值，本地化方案可只覆盖要改的）。"""
-    return _overlay(_config(), _langs()[lang()])
+def lang_config(name=None):
+    """指定语言（缺省当前语言）的全量配置：本地化方案递归覆盖顶层（顶层 fonts 是默认值，本地化方案可只覆盖要改的）。"""
+    return _overlay(_config(), _langs()[name or lang()])
 
 
-def lang_value(key, default=None):
-    value = lang_config().get(key)
+def lang_value(key, default=None, name=None):
+    value = lang_config(name).get(key)
     return default if value is None else value
 
 
-def lang_path(key):
+def lang_path(key, name=None):
     """本地化方案里的路径项（相对路径按仓库根解析）；没配返回 None。"""
-    value = lang_value(key)
+    value = lang_value(key, name=name)
     if not value:
         return None
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
-def work_dir():
-    """当前语言的中间产物根目录（work/<lang>/）。"""
-    return os.path.join(WORK, lang())
+def work_dir(name=None):
+    """指定语言的中间产物根目录（work/<lang>/），缺省当前语言。"""
+    return os.path.join(WORK, name or lang())
 
 
-def source_dir():
+def source_dir(name=None):
     """本地化方案的 source：该语言要导出的解包素材目录。"""
-    value = lang_value("source")
+    value = lang_value("source", name=name)
     if not value:
-        sys.exit("%s 的 langs.%s 里缺少 source (解包素材目录)" % (CONFIG_DEFAULT, lang()))
+        sys.exit("%s 的 langs.%s 里缺少 source (解包素材目录)" % (CONFIG_DEFAULT, name or lang()))
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
@@ -238,39 +274,39 @@ def input_dir():
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
-def _text_path(key, name):
+def _text_path(key, name, lang_name=None):
     """表路径：langs.<lang>.<key> 优先（相对路径按仓库根解析），缺省 <input_dir>/<name>。"""
-    value = lang_value(key)
+    value = lang_value(key, name=lang_name)
     if not value:
         return os.path.join(input_dir(), name)
     return value if os.path.isabs(value) else os.path.join(ROOT, value)
 
 
-def locale_file():
+def locale_file(name=None):
     """译文表（打包只读它），缺省 <input_dir>/texts.<lang>.csv。"""
-    return _text_path("locale_file", "texts.%s.csv" % lang())
+    return _text_path("locale_file", "texts.%s.csv" % (name or lang()), name)
 
 
-def src_file():
+def src_file(name=None):
     """原文表（校对底本），缺省 <input_dir>/texts.<lang>.src.csv。"""
-    return _text_path("src_file", "texts.%s.src.csv" % lang())
+    return _text_path("src_file", "texts.%s.src.csv" % (name or lang()), name)
 
 
-def _col(key, default=None):
-    value = lang_value(key) or default
+def _col(key, default=None, name=None):
+    value = lang_value(key, name=name) or default
     if not value:
-        sys.exit("%s 的 langs.%s 里缺少 %s (列名)" % (CONFIG_DEFAULT, lang(), key))
+        sys.exit("%s 的 langs.%s 里缺少 %s (列名)" % (CONFIG_DEFAULT, name or lang(), key))
     return value
 
 
-def src_col():
+def src_col(name=None):
     """原文列（导出写它、origin 校验读它）。"""
-    return _col("src_col", "src")
+    return _col("src_col", "src", name)
 
 
-def locale_col():
+def locale_col(name=None):
     """译文列（打包只读它）。"""
-    return _col("locale_col")
+    return _col("locale_col", None, name)
 
 
 def option(name):
@@ -317,15 +353,17 @@ def discs():
     raw = lang_value("discs")
     if not isinstance(raw, list) or not raw:
         sys.exit("%s 的 langs.%s 里缺 discs (每个盘一项 {region, language})" % (CONFIG_DEFAULT, lang()))
+    known = locale_codes()
+    hints = locale_region()
     out = []
     for item in raw:
         region = str((item or {}).get("region") or "").lower()
         language = str((item or {}).get("language") or "").lower()
         if region not in REGIONS:
             sys.exit("discs 里的 region 无效：%r（可选 %s）" % (region, " / ".join(REGIONS)))
-        if language not in LANGUAGES:
-            sys.exit("discs 里的 language 无效：%r（可选 %s）" % (language, " / ".join(LANGUAGES)))
-        expect = LANG_REGION.get(language)
+        if language not in known:
+            sys.exit("discs 里的 language 无效：%r（可选 %s）" % (language, " / ".join(known)))
+        expect = hints.get(language)
         if expect and expect != region:
             print("警告：language=%s 通常出现在 %s 版盘，region=%s 可能没有该消息目录"
                   % (language, expect, region), file=sys.stderr)

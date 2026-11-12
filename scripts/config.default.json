@@ -8,6 +8,41 @@
     "input_dir": "input",
     "default_lang": "zh-Hans",
     "font_source": "input/font",
+
+    "bundle": {
+        "meta": {
+            "id": "yiga.cn.eu",
+            "name": "Chinese Translation",
+            "version": "1.1.0",
+            "author": "Yiga Clan",
+            "description": "Chinese translation for Twilight Princess on any GC or Wii disc. Pick your game language in the mod panel; Simplified, Traditional and DeepSeek-revised text included.",
+            "icon": "assets/icon.png",
+            "banner": "assets/banner.png"
+        },
+        "translations": [
+            { "lang": "zh-Hans", "label": "Simplified Chinese" },
+            { "lang": "zh-Hant", "label": "Traditional Chinese" },
+            { "lang": "cn", "label": "Simplified Chinese (DeepSeek)" }
+        ],
+        "default_translation": "zh-Hans",
+        "font_regions": [ "us", "eu", "jp" ],
+        "locales": [
+            { "code": "us", "label": "English (US disc)", "region": "us" },
+            { "code": "uk", "label": "English (EU disc)", "region": "eu" },
+            { "code": "de", "label": "German", "region": "eu" },
+            { "code": "fr", "label": "French", "region": "eu" },
+            { "code": "sp", "label": "Spanish", "region": "eu" },
+            { "code": "it", "label": "Italian", "region": "eu" },
+            { "code": "jp", "label": "Japanese", "region": "jp" }
+        ],
+        "default_locales": [ "fr" ],
+        "ui": {
+            "label_translation": "Translation",
+            "section_locale": "Game language",
+            "hint": "Text applies on the next load. Fonts need a game restart."
+        }
+    },
+
     "langs": {
         "zh-Hans": {
             "source": "input/msg",
@@ -85,33 +120,6 @@
                 "version": "1.0.4",
                 "author": "Yiga Clan",
                 "description": "Chinese translation translated from English (US) text by an AI.",
-                "icon": "assets/icon.png",
-                "banner": "assets/banner.png"
-            }
-        },
-        "en": {
-            "source": "input/msg_us",
-            "src_file": "input/texts.en.csv",
-            "src_col": "en",
-            "locale_col": "en",
-            "discs": [
-                { "region": "us", "language": "us" }
-            ],
-            "mod": {
-                "id": "yiga.en.{region}",
-                "name": "English (US) Text Repack",
-                "version": "1.0.0",
-                "author": "Yiga Clan",
-                "description": "Repacks the game's own English (US) text with the open-source font set.",
-                "icon": "assets/icon.png",
-                "banner": "assets/banner.png"
-            },
-            "mod_origin": {
-                "id": "yiga.en.{region}.orig",
-                "name": "English (US) Text Repack (bitmap font)",
-                "version": "1.0.0",
-                "author": "Yiga Clan",
-                "description": "Repacks the game's own English (US) text, keeping the original bitmap font.",
                 "icon": "assets/icon.png",
                 "banner": "assets/banner.png"
             }
