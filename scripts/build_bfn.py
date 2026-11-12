@@ -86,12 +86,17 @@ def halfwidth_aliases(slots):
 
 
 def slots_of(pairs):
-    """({码位: 字形格}, 格总数)：ASCII 走 method 0 恒等，其余按码位升序。"""
+    """({码位: 字形格}, 格总数)：ASCII 走 method 0 恒等，其余按码位升序；同一个字只用一格。"""
     slots = {c: c - ASCII_LO for c in range(ASCII_LO, ASCII_HI + 1)}
+    by_char = {chr(c): slots[c] for c in range(ASCII_LO, ASCII_HI + 1)}
     nxt = ASCII_HI - ASCII_LO + 1
     for code in sorted(c for c in pairs if c not in slots):
-        slots[code] = nxt
-        nxt += 1
+        char = pairs[code]
+        slot = by_char.get(char)
+        if slot is None:
+            slot = by_char[char] = nxt
+            nxt += 1
+        slots[code] = slot
     return slots, nxt
 
 
