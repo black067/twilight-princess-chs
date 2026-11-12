@@ -59,7 +59,7 @@
             "mod": {
                 "id": "yiga.zh.hant.{region}",
                 "name": "Chinese (Traditional) Translation",
-                "version": "1.0.0",
+                "version": "1.0.3",
                 "author": "Yiga Clan",
                 "description": "A Chinese (Traditional) translation mod",
                 "icon": "assets/icon.png",
